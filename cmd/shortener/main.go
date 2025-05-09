@@ -13,7 +13,7 @@ import (
 
 const (
 	ShortIDLen  = 10                // Длина короткого идентификатора
-	ServerPort  = "8080"            // Порт сервера
+	ServerPort  = ":8080"           // Порт сервера
 	IdleTimeout = 600 * time.Second // Таймаут сервера
 )
 
@@ -40,8 +40,8 @@ var (
 func Launch() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", ShortenHandler)
-	mux.HandleFunc("/", RedirectHandler)
+	mux.HandleFunc("POST /", ShortenHandler)
+	mux.HandleFunc("GET /", RedirectHandler)
 
 	serv := http.Server{
 		Addr:        ServerPort,
@@ -59,6 +59,7 @@ func Launch() {
 func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, ErrorMethodNowAllowed.Error(), http.StatusMethodNotAllowed)
+
 	}
 
 	queryBody, readErr := io.ReadAll(r.Body)
