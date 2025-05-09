@@ -41,7 +41,7 @@ func Launch() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", ShortenHandler)
-	// mux.HandleFunc("/", RedirectHandler)
+	mux.HandleFunc("/", RedirectHandler)
 
 	serv := http.Server{
 		Addr:        ServerPort,
@@ -87,30 +87,30 @@ func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, newURL)
 }
 
-// // Обработка запроса на переход по полному URL:
-// func RedirectHandler(w http.ResponseWriter, r *http.Request) {
-// 	if r.Method != http.MethodGet {
-// 		http.Error(w, ErrorMethodNowAllowed.Error(), http.StatusMethodNotAllowed)
-// 	}
+// Обработка запроса на переход по полному URL:
+func RedirectHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, ErrorMethodNowAllowed.Error(), http.StatusMethodNotAllowed)
+	}
 
-// 	queryID := r.URL.Path
-// 	if len(queryID) != ShortIDLen+1 {
-// 		http.Error(w, ErrorInvalidShortID.Error(), http.StatusNotFound)
-// 		return
-// 	}
+	queryID := r.URL.Path
+	if len(queryID) != ShortIDLen+1 {
+		http.Error(w, ErrorInvalidShortID.Error(), http.StatusNotFound)
+		return
+	}
 
-// 	queryID = queryID[1:]
+	queryID = queryID[1:]
 
-// 	UrlStore, exists := UrlStore[queryID]
+	UrlStore, exists := UrlStore[queryID]
 
-// 	if !exists {
-// 		http.Error(w, ErrorNotInDB.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
+	if !exists {
+		http.Error(w, ErrorNotInDB.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// 	w.Header().Set("Location", UrlStore)
-// 	w.WriteHeader(http.StatusTemporaryRedirect)
-// }
+	w.Header().Set("Location", UrlStore)
+	w.WriteHeader(http.StatusTemporaryRedirect)
+}
 
 // Проверим URL на корректность:
 func CheckURL(reqURL string) (*url.URL, error) {
