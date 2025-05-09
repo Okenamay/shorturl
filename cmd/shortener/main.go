@@ -58,8 +58,8 @@ func Launch() {
 // Обработка запросов на сокращение URL:
 func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, ErrorMethodNowAllowed.Error(), http.StatusMethodNotAllowed)
-
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	queryBody, readErr := io.ReadAll(r.Body)
@@ -91,7 +91,8 @@ func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 // Обработка запроса на переход по полному URL:
 func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, ErrorMethodNowAllowed.Error(), http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	queryID := r.URL.Path
@@ -109,6 +110,7 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Location", URLStore)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
