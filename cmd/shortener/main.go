@@ -18,7 +18,7 @@ const (
 )
 
 var (
-	UrlStore = make(map[string]string) // Мапа для хранения пар ID – URL
+	URLStore = make(map[string]string) // Мапа для хранения пар ID – URL
 )
 
 // Набор сообщений об ошибках:
@@ -101,14 +101,14 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 
 	queryID = queryID[1:]
 
-	UrlStore, exists := UrlStore[queryID]
+	URLStore, exists := URLStore[queryID]
 
 	if !exists {
 		http.Error(w, ErrorNotInDB.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Location", UrlStore)
+	w.Header().Set("Location", URLStore)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
@@ -152,9 +152,9 @@ func MakeFullURL(r *http.Request, port string, shortID string) string {
 	return newURL
 }
 
-// Сохранение пары fullURL-shortID в urlStore:
+// Сохранение пары fullURL-shortID в URLStore:
 func StoreURLIDPair(shortID, fullURL string) {
-	UrlStore[shortID] = fullURL
+	URLStore[shortID] = fullURL
 }
 
 // Main:
