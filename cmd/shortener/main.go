@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -38,18 +40,18 @@ var (
 
 // Запуск HTTP-сервера и работа с запросами:
 func Launch() {
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
 
-	mux.HandleFunc("POST /", ShortenHandler)
-	mux.HandleFunc("GET /", RedirectHandler)
+	router.HandleFunc("/", ShortenHandler).Methods("POST")
+	router.HandleFunc("/", RedirectHandler).Methods("GET")
 
-	serv := http.Server{
+	server := http.Server{
 		Addr:        ServerPort,
-		Handler:     mux,
+		Handler:     router,
 		IdleTimeout: IdleTimeout,
 	}
 
-	err := serv.ListenAndServe()
+	err := server.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}
