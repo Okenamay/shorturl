@@ -43,7 +43,7 @@ func Launch() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/", ShortenHandler).Methods("POST")
-	router.HandleFunc("/", RedirectHandler).Methods("GET")
+	router.HandleFunc("/{id}", RedirectHandler).Methods("GET")
 
 	server := http.Server{
 		Addr:        ServerPort,
@@ -97,15 +97,15 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queryID := r.URL.Path
-	if len(queryID) != ShortIDLen+1 {
+	vars := mux.Vars(r)
+	queryID := vars["id"]
+
+	if len(queryID) != ShortIDLen {
 		http.Error(w, ErrorInvalidShortID.Error(), http.StatusNotFound)
 		return
 	}
 
-	queryID = queryID[1:]
-
-	URLStore, exists := URLStore[queryID]
+	fullURL, exists := URLStore[queryID]
 
 	if !exists {
 		http.Error(w, ErrorNotInDB.Error(), http.StatusInternalServerError)
@@ -113,7 +113,7 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Location", URLStore)
+	w.Header().Set("Location", fullURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
