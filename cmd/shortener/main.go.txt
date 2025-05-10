@@ -43,7 +43,7 @@ func Launch() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/", ShortenHandler).Methods("POST")
-	router.HandleFunc("/{id}", RedirectHandler)
+	router.HandleFunc("/{id}", RedirectHandler).Methods("GET")
 
 	server := http.Server{
 		Addr:        ServerPort,

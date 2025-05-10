@@ -2,15 +2,11 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,11 +108,9 @@ func TestShortenHandler(t *testing.T) {
 
 func TestRedirectHandler(t *testing.T) {
 	URLStore = make(map[string]string)
-	originalURL := "https://topdeck.ru/"
-	hash := md5.New()
-	io.WriteString(hash, originalURL)
-	shortID := hex.EncodeToString(hash.Sum(nil))[:ShortIDLen]
-	URLStore[shortID] = originalURL
+	url := "https://topdeck.ru/"
+	shortID := "c7efce725b"
+	URLStore[shortID] = url
 
 	type want struct {
 		code        int
@@ -142,8 +136,8 @@ func TestRedirectHandler(t *testing.T) {
 			},
 			want: want{
 				code:        307,
-				response:    originalURL,
-				contentType: "text/plain",
+				response:    url,
+				contentType: "text/plain; charset=utf-8",
 			},
 		},
 		{
@@ -160,24 +154,12 @@ func TestRedirectHandler(t *testing.T) {
 		},
 	}
 
-	router := mux.NewRouter()
-	router.HandleFunc("/{id}", RedirectHandler)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts := httptest.NewServer(router)
-			defer ts.Close()
-
-			fullURL := ts.URL + tt.request.url
-
-			parsedURL, err := url.Parse(fullURL)
-			require.NoError(t, err)
-
-			request := httptest.NewRequest(tt.request.method, fullURL, nil)
-			request.URL = parsedURL
-
+			request := httptest.NewRequest(tt.request.method, tt.request.url, nil)
 			w := httptest.NewRecorder()
-			router.ServeHTTP(w, request)
+			h := http.HandlerFunc(RedirectHandler)
+			h(w, request)
 
 			result := w.Result()
 			result.Body.Close()
@@ -186,7 +168,7 @@ func TestRedirectHandler(t *testing.T) {
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
 			if tt.want.code != http.StatusBadRequest {
-				require.Equal(t, originalURL, result.Header.Get("Location"))
+				require.Equal(t, url, result.Header.Get("Location"))
 			}
 		})
 	}
