@@ -147,12 +147,13 @@ func AbbreviateURL(fullURL string) string {
 
 // Составление строки с сокращённым URL:
 func MakeFullURL(r *http.Request, port string, shortID string) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
+	// scheme := "http"
+	// if r.TLS != nil {
+	// 	scheme = "https"
+	// }
 
-	newURL := scheme + "://" + cfg.ShortIDServerPort + "/" + shortID
+	// newURL := scheme + "://" + cfg.ShortIDServerPort + "/" + shortID
+	newURL := cfg.ShortIDServerPort + "/" + shortID
 
 	return newURL
 }

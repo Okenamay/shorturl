@@ -6,10 +6,10 @@ import (
 
 // Дефолтные значения до применения флагов:
 const (
-	ShortIDLen        = 10               // Длина короткого идентификатора
-	IdleTimeout       = 600              // Таймаут сервера в секундах
-	ServerPort        = ":8080"          // Адрес и порт сервера
-	ShortIDServerPort = "localhost:8080" // Адрес и порт для коротких ID
+	ShortIDLen        = 10                      // Длина короткого идентификатора
+	IdleTimeout       = 600                     // Таймаут сервера в секундах
+	ServerPort        = ":8080"                 // Адрес и порт сервера
+	ShortIDServerPort = "http://localhost:8080" // Адрес и порт для коротких ID
 )
 
 var cfg struct {

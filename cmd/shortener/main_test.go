@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -171,6 +172,7 @@ func TestRedirectHandler(t *testing.T) {
 			defer ts.Close()
 
 			fullURL := ts.URL + tt.request.url
+			strings.Replace()
 
 			parsedURL, err := url.Parse(fullURL)
 			require.NoError(t, err)
