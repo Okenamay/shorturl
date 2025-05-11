@@ -13,6 +13,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/Okenamay/shorturl/internal/config"
 )
 
 func TestShortenHandler(t *testing.T) {
@@ -95,6 +97,7 @@ func TestShortenHandler(t *testing.T) {
 			h(w, request)
 
 			result := w.Result()
+			defer result.Body.Close()
 
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
@@ -115,7 +118,7 @@ func TestRedirectHandler(t *testing.T) {
 	originalURL := "https://topdeck.ru/"
 	hash := md5.New()
 	io.WriteString(hash, originalURL)
-	shortID := hex.EncodeToString(hash.Sum(nil))[:ShortIDLen]
+	shortID := hex.EncodeToString(hash.Sum(nil))[:config.cfg.ShortIDLen]
 	URLStore[shortID] = originalURL
 
 	type want struct {
