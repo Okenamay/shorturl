@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	// _ "github.com/Okenamay/shorturl/internal/config"
 )
 
 func TestShortenHandler(t *testing.T) {
@@ -113,6 +112,7 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
+	parseFlags()
 	URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
 	hash := md5.New()

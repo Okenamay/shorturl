@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	// _ "github.com/Okenamay/shorturl/internal/config"
 )
 
 // const (
