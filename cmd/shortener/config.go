@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"os"
 )
 
 // Дефолтные значения до применения флагов:
@@ -29,4 +30,12 @@ func parseFlags() {
 	flag.StringVar(&cfg.ShortIDServerPort, "b", ShortIDServerPort,
 		"Адрес коротких ID в формате host:port/path")
 	flag.Parse()
+
+	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
+		cfg.ServerPort = servPort
+	}
+
+	if shortIDServPort, ok := os.LookupEnv("BASE_URL"); ok && shortIDServPort != "" {
+		cfg.ShortIDServerPort = shortIDServPort
+	}
 }
