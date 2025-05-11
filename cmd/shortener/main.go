@@ -153,7 +153,7 @@ func MakeFullURL(r *http.Request, port string, shortID string) string {
 		scheme = "https"
 	}
 
-	newURL := scheme + cfg.ShortIDServerPort + shortID
+	newURL := scheme + "://" + cfg.ShortIDServerPort + "/" + shortID
 
 	return newURL
 }
