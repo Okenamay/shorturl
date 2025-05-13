@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/gorilla/mux"
 )
 
@@ -46,9 +47,9 @@ func Launch() {
 	router.HandleFunc("/{id}", RedirectHandler)
 
 	server := http.Server{
-		Addr:        cfg.ServerPort,
+		Addr:        config.Cfg.ServerPort,
 		Handler:     router,
-		IdleTimeout: time.Duration(cfg.IdleTimeout) * time.Second,
+		IdleTimeout: time.Duration(config.Cfg.IdleTimeout) * time.Second,
 	}
 
 	err := server.ListenAndServe()
@@ -81,7 +82,7 @@ func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortID := AbbreviateURL(fullURL)
 
-	newURL := MakeFullURL(r, cfg.ServerPort, shortID)
+	newURL := MakeFullURL(r, config.Cfg.ServerPort, shortID)
 
 	StoreURLIDPair(shortID, fullURL)
 
@@ -100,7 +101,7 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	queryID := vars["id"]
 
-	if len(queryID) != cfg.ShortIDLen {
+	if len(queryID) != config.Cfg.ShortIDLen {
 		http.Error(w, ErrorInvalidShortID.Error(), http.StatusNotFound)
 		return
 	}
@@ -142,7 +143,7 @@ func AbbreviateURL(fullURL string) string {
 
 	shortID := hex.EncodeToString(hash.Sum(nil))
 
-	return shortID[:cfg.ShortIDLen]
+	return shortID[:config.Cfg.ShortIDLen]
 }
 
 // Составление строки с сокращённым URL:
@@ -152,8 +153,8 @@ func MakeFullURL(r *http.Request, port string, shortID string) string {
 	// 	scheme = "https"
 	// }
 
-	// newURL := scheme + "://" + cfg.ShortIDServerPort + "/" + shortID
-	newURL := cfg.ShortIDServerPort + "/" + shortID
+	// newURL := scheme + "://" + config.Cfg.ShortIDServerPort + "/" + shortID
+	newURL := config.Cfg.ShortIDServerPort + "/" + shortID
 
 	return newURL
 }
@@ -165,9 +166,9 @@ func StoreURLIDPair(shortID, fullURL string) {
 
 // Main:
 func main() {
-	parseFlags()
+	config.ParseFlags()
 
-	log.Printf("Starting server on port %s", cfg.ServerPort)
+	log.Printf("Starting server on port %s", config.Cfg.ServerPort)
 
 	Launch()
 }

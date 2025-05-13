@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -112,12 +113,12 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
-	parseFlags()
+	config.ParseFlags()
 	URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
 	hash := md5.New()
 	io.WriteString(hash, originalURL)
-	shortID := hex.EncodeToString(hash.Sum(nil))[:cfg.ShortIDLen]
+	shortID := hex.EncodeToString(hash.Sum(nil))[:config.Cfg.ShortIDLen]
 	URLStore[shortID] = originalURL
 
 	type want struct {
