@@ -12,6 +12,7 @@ import (
 
 	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/gorilla/mux"
+	_ "go.uber.org/zap"
 )
 
 // const (
