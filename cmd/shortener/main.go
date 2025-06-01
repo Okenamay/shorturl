@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -38,18 +40,18 @@ var (
 
 // Запуск HTTP-сервера и работа с запросами:
 func Launch() {
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
 
-	mux.HandleFunc("POST /", ShortenHandler)
-	mux.HandleFunc("GET /", RedirectHandler)
+	router.HandleFunc("/", ShortenHandler).Methods("POST")
+	router.HandleFunc("/{id}", RedirectHandler)
 
-	serv := http.Server{
+	server := http.Server{
 		Addr:        ServerPort,
-		Handler:     mux,
+		Handler:     router,
 		IdleTimeout: IdleTimeout,
 	}
 
-	err := serv.ListenAndServe()
+	err := server.ListenAndServe()
 	if err != nil {
 		panic(err)
 	}
@@ -95,15 +97,15 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queryID := r.URL.Path
-	if len(queryID) != ShortIDLen+1 {
+	vars := mux.Vars(r)
+	queryID := vars["id"]
+
+	if len(queryID) != ShortIDLen {
 		http.Error(w, ErrorInvalidShortID.Error(), http.StatusNotFound)
 		return
 	}
 
-	queryID = queryID[1:]
-
-	URLStore, exists := URLStore[queryID]
+	fullURL, exists := URLStore[queryID]
 
 	if !exists {
 		http.Error(w, ErrorNotInDB.Error(), http.StatusInternalServerError)
@@ -111,7 +113,7 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("Location", URLStore)
+	w.Header().Set("Location", fullURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 

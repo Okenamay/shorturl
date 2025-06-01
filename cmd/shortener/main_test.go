@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"crypto/md5"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,7 +111,12 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
-	url := "https://topdeck.ru/"
+	URLStore = make(map[string]string)
+	originalURL := "https://topdeck.ru/"
+	hash := md5.New()
+	io.WriteString(hash, originalURL)
+	shortID := hex.EncodeToString(hash.Sum(nil))[:ShortIDLen]
+	URLStore[shortID] = originalURL
 
 	type want struct {
 		code        int
@@ -130,11 +138,11 @@ func TestRedirectHandler(t *testing.T) {
 			name: "RedirectHandler Correct Method",
 			request: request{
 				method: http.MethodGet,
-				url:    "/",
+				url:    "/" + shortID,
 			},
 			want: want{
 				code:        307,
-				response:    url,
+				response:    originalURL,
 				contentType: "text/plain",
 			},
 		},
@@ -142,7 +150,7 @@ func TestRedirectHandler(t *testing.T) {
 			name: "RedirectHandler Wrong Method",
 			request: request{
 				method: http.MethodPost,
-				url:    "/",
+				url:    "/" + shortID,
 			},
 			want: want{
 				code:        400,
@@ -152,23 +160,24 @@ func TestRedirectHandler(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte(url)))
-	w := httptest.NewRecorder()
-	h := http.HandlerFunc(ShortenHandler)
-	h(w, req)
-
-	result := w.Result()
-	newURL, _ := io.ReadAll(result.Body)
-	result.Body.Close()
-
-	fmt.Println(string(newURL))
+	router := mux.NewRouter()
+	router.HandleFunc("/{id}", RedirectHandler)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := httptest.NewRequest(tt.request.method, string(newURL), nil)
+			ts := httptest.NewServer(router)
+			defer ts.Close()
+
+			fullURL := ts.URL + tt.request.url
+
+			parsedURL, err := url.Parse(fullURL)
+			require.NoError(t, err)
+
+			request := httptest.NewRequest(tt.request.method, fullURL, nil)
+			request.URL = parsedURL
+
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(RedirectHandler)
-			h(w, request)
+			router.ServeHTTP(w, request)
 
 			result := w.Result()
 			result.Body.Close()
@@ -177,7 +186,7 @@ func TestRedirectHandler(t *testing.T) {
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
 			if tt.want.code != http.StatusBadRequest {
-				require.Equal(t, url, result.Header.Get("Location"))
+				require.Equal(t, originalURL, result.Header.Get("Location"))
 			}
 		})
 	}
