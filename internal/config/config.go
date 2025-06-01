@@ -1,7 +1,8 @@
-package main
+package config
 
 import (
 	"flag"
+	"os"
 )
 
 // Дефолтные значения до применения флагов:
@@ -12,21 +13,29 @@ const (
 	ShortIDServerPort = "http://localhost:8080" // Адрес и порт для коротких ID
 )
 
-var cfg struct {
+var Cfg struct {
 	ShortIDLen        int
 	IdleTimeout       int
 	ServerPort        string
 	ShortIDServerPort string
 }
 
-func parseFlags() {
-	flag.IntVar(&cfg.ShortIDLen, "l", ShortIDLen,
+func ParseFlags() {
+	flag.IntVar(&Cfg.ShortIDLen, "l", ShortIDLen,
 		"Длина короткого ID – целое число от 8 до 32")
-	flag.IntVar(&cfg.IdleTimeout, "t", IdleTimeout,
+	flag.IntVar(&Cfg.IdleTimeout, "t", IdleTimeout,
 		"Таймаут сервера – целое число, желательно от 10 до 600")
-	flag.StringVar(&cfg.ServerPort, "a", ServerPort,
+	flag.StringVar(&Cfg.ServerPort, "a", ServerPort,
 		"Адрес запуска сервера в формате host:port или :port")
-	flag.StringVar(&cfg.ShortIDServerPort, "b", ShortIDServerPort,
+	flag.StringVar(&Cfg.ShortIDServerPort, "b", ShortIDServerPort,
 		"Адрес коротких ID в формате host:port/path")
 	flag.Parse()
+
+	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
+		Cfg.ServerPort = servPort
+	}
+
+	if shortIDServPort, ok := os.LookupEnv("BASE_URL"); ok && shortIDServPort != "" {
+		Cfg.ShortIDServerPort = shortIDServPort
+	}
 }
