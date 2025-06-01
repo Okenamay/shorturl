@@ -13,11 +13,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const (
-	ShortIDLen  = 10                // Длина короткого идентификатора
-	ServerPort  = ":8080"           // Порт сервера
-	IdleTimeout = 600 * time.Second // Таймаут сервера
-)
+// const (
+// 	ShortIDLen  = 10      // Длина короткого идентификатора
+// 	ServerPort  = ":8080" // Адрес и порт сервера
+// 	IdleTimeout = 600     // Таймаут сервера
+// )
 
 var (
 	URLStore = make(map[string]string) // Мапа для хранения пар ID – URL
@@ -25,11 +25,11 @@ var (
 
 // Набор сообщений об ошибках:
 var (
-	ErrorMethodNowAllowed = errors.New("method not allowed")
-	ErrorServer           = errors.New("server error")
-	ErrorInvalidURL       = errors.New("invalid URL")
-	ErrorNoHost           = errors.New("no URL host found")
-	ErrorHTTPS            = errors.New("invalid URL scheme")
+	// ErrorMethodNowAllowed = errors.New("method not allowed")
+	ErrorServer     = errors.New("server error")
+	ErrorInvalidURL = errors.New("invalid URL")
+	ErrorNoHost     = errors.New("no URL host found")
+	ErrorHTTPS      = errors.New("invalid URL scheme")
 	// ErrorBadRequest       = errors.New("bad request")
 	// ErrorNotFound         = errors.New("URL not found")
 	// ErrorURLTooLong       = errors.New("provided URL too long")
@@ -46,9 +46,9 @@ func Launch() {
 	router.HandleFunc("/{id}", RedirectHandler)
 
 	server := http.Server{
-		Addr:        ServerPort,
+		Addr:        cfg.ServerPort,
 		Handler:     router,
-		IdleTimeout: IdleTimeout,
+		IdleTimeout: time.Duration(cfg.IdleTimeout) * time.Second,
 	}
 
 	err := server.ListenAndServe()
@@ -81,7 +81,7 @@ func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortID := AbbreviateURL(fullURL)
 
-	newURL := MakeFullURL(r, ServerPort, shortID)
+	newURL := MakeFullURL(r, cfg.ServerPort, shortID)
 
 	StoreURLIDPair(shortID, fullURL)
 
@@ -100,7 +100,7 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	queryID := vars["id"]
 
-	if len(queryID) != ShortIDLen {
+	if len(queryID) != cfg.ShortIDLen {
 		http.Error(w, ErrorInvalidShortID.Error(), http.StatusNotFound)
 		return
 	}
@@ -142,17 +142,18 @@ func AbbreviateURL(fullURL string) string {
 
 	shortID := hex.EncodeToString(hash.Sum(nil))
 
-	return shortID[:ShortIDLen]
+	return shortID[:cfg.ShortIDLen]
 }
 
 // Составление строки с сокращённым URL:
 func MakeFullURL(r *http.Request, port string, shortID string) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
+	// scheme := "http"
+	// if r.TLS != nil {
+	// 	scheme = "https"
+	// }
 
-	newURL := scheme + "://localhost" + port + "/" + shortID
+	// newURL := scheme + "://" + cfg.ShortIDServerPort + "/" + shortID
+	newURL := cfg.ShortIDServerPort + "/" + shortID
 
 	return newURL
 }
@@ -164,7 +165,9 @@ func StoreURLIDPair(shortID, fullURL string) {
 
 // Main:
 func main() {
-	log.Printf("Starting server on port %s", ServerPort)
+	parseFlags()
+
+	log.Printf("Starting server on port %s", cfg.ServerPort)
 
 	Launch()
 }

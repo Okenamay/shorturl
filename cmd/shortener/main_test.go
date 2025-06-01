@@ -95,6 +95,7 @@ func TestShortenHandler(t *testing.T) {
 			h(w, request)
 
 			result := w.Result()
+			defer result.Body.Close()
 
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
@@ -111,11 +112,12 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
+	parseFlags()
 	URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
 	hash := md5.New()
 	io.WriteString(hash, originalURL)
-	shortID := hex.EncodeToString(hash.Sum(nil))[:ShortIDLen]
+	shortID := hex.EncodeToString(hash.Sum(nil))[:cfg.ShortIDLen]
 	URLStore[shortID] = originalURL
 
 	type want struct {
