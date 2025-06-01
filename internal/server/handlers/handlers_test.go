@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"bytes"
@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	config "github.com/Okenamay/shorturl.git/internal/config"
-	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
 	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +93,7 @@ func TestShortenHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(handlers.ShortenHandler)
+			h := http.HandlerFunc(ShortenHandler)
 			h(w, request)
 
 			result := w.Result()
@@ -166,7 +165,7 @@ func TestRedirectHandler(t *testing.T) {
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/{id}", handlers.RedirectHandler)
+	router.HandleFunc("/{id}", RedirectHandler)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -195,8 +194,4 @@ func TestRedirectHandler(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestJSONHandler(t *testing.T) {
-
 }

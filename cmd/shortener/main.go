@@ -14,13 +14,13 @@ func main() {
 
 	sugar, err := logger.InitLogger()
 	if err != nil {
-		sugar.Fatalw(err.Error(), "event", "start logger")
+		sugar.Fatalw(err.Error(), "Main", "Start logger")
 	}
 
 	sugar.Infow("Starting server on port: ", config.Cfg.ServerPort)
 
 	err = router.Launch()
 	if err != nil {
-		sugar.Fatalw(err.Error(), "event", "start server")
+		sugar.Fatalw(err.Error(), "Main", "Start server")
 	}
 }
