@@ -37,7 +37,7 @@ func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortID := hasher.ShortenURL(fullURL)
 
-	newURL := urlmaker.MakeFullURL(r, config.Cfg.ServerPort, shortID)
+	newURL := urlmaker.MakeFullURL(shortID)
 
 	memstorage.StoreURLIDPair(shortID, fullURL)
 

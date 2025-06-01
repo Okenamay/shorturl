@@ -196,3 +196,7 @@ func TestRedirectHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestJSONHandler(t *testing.T) {
+
+}

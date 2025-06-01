@@ -12,15 +12,15 @@ import (
 func main() {
 	config.ParseFlags()
 
-	err := logger.InitLogger()
+	sugar, err := logger.InitLogger()
 	if err != nil {
-		logger.Sugar.Fatalw(err.Error(), "event", "start logger")
+		sugar.Fatalw(err.Error(), "event", "start logger")
 	}
 
-	logger.Sugar.Infow("Starting server on port: ", config.Cfg.ServerPort)
+	sugar.Infow("Starting server on port: ", config.Cfg.ServerPort)
 
 	err = router.Launch()
 	if err != nil {
-		logger.Sugar.Fatalw(err.Error(), "event", "start server")
+		sugar.Fatalw(err.Error(), "event", "start server")
 	}
 }

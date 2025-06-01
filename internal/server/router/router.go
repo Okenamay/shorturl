@@ -17,7 +17,8 @@ func Launch() error {
 	router.Use(logger.WithLogging)
 
 	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
-	router.HandleFunc("/{id}", handlers.RedirectHandler)
+	router.HandleFunc("/api/shorten", handlers.JSONHandler).Methods("POST")
+	router.HandleFunc("/{id}", handlers.RedirectHandler).Methods("GET")
 
 	server := http.Server{
 		Addr:        config.Cfg.ServerPort,
