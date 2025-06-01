@@ -10,7 +10,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/Okenamay/shorturl.git/internal/config"
+	config "github.com/Okenamay/shorturl.git/internal/config"
+	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
+	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +37,7 @@ func TestShortenHandler(t *testing.T) {
 		want    want
 	}{
 		{
-			name: "ShortenHandler Correct Method",
+			name: "ShortenHandler_Correct_Method",
 			request: request{
 				method: http.MethodPost,
 				url:    "/",
@@ -48,7 +50,7 @@ func TestShortenHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "ShortenHandler Incorrect Method",
+			name: "ShortenHandler_Incorrect_Method",
 			request: request{
 				method: http.MethodGet,
 				url:    "/",
@@ -61,27 +63,27 @@ func TestShortenHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "ShortenHandler Incorrect Scheme",
+			name: "ShortenHandler_Incorrect_Scheme",
 			request: request{
 				method: http.MethodPost,
 				url:    "/",
 				body:   []byte("ftp://tcgplayer.com/"),
 			},
 			want: want{
-				code:        422,
+				code:        400,
 				response:    "",
 				contentType: "text/plain; charset=utf-8",
 			},
 		},
 		{
-			name: "ShortenHandler Incorrect URL",
+			name: "ShortenHandler_Incorrect_URL",
 			request: request{
 				method: http.MethodPost,
 				url:    "/",
 				body:   []byte("hilmar.v.petursson@ccpgames.com"),
 			},
 			want: want{
-				code:        422,
+				code:        400,
 				response:    "",
 				contentType: "text/plain; charset=utf-8",
 			},
@@ -92,7 +94,7 @@ func TestShortenHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(ShortenHandler)
+			h := http.HandlerFunc(handlers.ShortenHandler)
 			h(w, request)
 
 			result := w.Result()
@@ -114,12 +116,12 @@ func TestShortenHandler(t *testing.T) {
 
 func TestRedirectHandler(t *testing.T) {
 	config.ParseFlags()
-	URLStore = make(map[string]string)
+	memstorage.URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
 	hash := md5.New()
 	io.WriteString(hash, originalURL)
 	shortID := hex.EncodeToString(hash.Sum(nil))[:config.Cfg.ShortIDLen]
-	URLStore[shortID] = originalURL
+	memstorage.URLStore[shortID] = originalURL
 
 	type want struct {
 		code        int
@@ -138,7 +140,7 @@ func TestRedirectHandler(t *testing.T) {
 		want    want
 	}{
 		{
-			name: "RedirectHandler Correct Method",
+			name: "RedirectHandler_Correct_Method",
 			request: request{
 				method: http.MethodGet,
 				url:    "/" + shortID,
@@ -150,7 +152,7 @@ func TestRedirectHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "RedirectHandler Wrong Method",
+			name: "RedirectHandler_Wrong_Method",
 			request: request{
 				method: http.MethodPost,
 				url:    "/" + shortID,
@@ -164,7 +166,7 @@ func TestRedirectHandler(t *testing.T) {
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/{id}", RedirectHandler)
+	router.HandleFunc("/{id}", handlers.RedirectHandler)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
