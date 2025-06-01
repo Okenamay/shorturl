@@ -1,9 +1,8 @@
 package main
 
 import (
-	"log"
-
 	"github.com/Okenamay/shorturl.git/internal/config"
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	router "github.com/Okenamay/shorturl.git/internal/server/router"
 
 	_ "go.uber.org/zap"
@@ -13,10 +12,15 @@ import (
 func main() {
 	config.ParseFlags()
 
-	log.Printf("Starting server on port %s", config.Cfg.ServerPort)
-
-	err := router.Launch()
+	err := logger.InitLogger()
 	if err != nil {
-		log.Fatal(err)
+		logger.Sugar.Fatalw(err.Error(), "event", "start logger")
+	}
+
+	logger.Sugar.Infow("Starting server on port: ", config.Cfg.ServerPort)
+
+	err = router.Launch()
+	if err != nil {
+		logger.Sugar.Fatalw(err.Error(), "event", "start server")
 	}
 }

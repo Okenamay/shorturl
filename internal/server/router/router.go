@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Okenamay/shorturl.git/internal/config"
+	config "github.com/Okenamay/shorturl.git/internal/config"
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
 	"github.com/gorilla/mux"
 )
@@ -12,6 +13,8 @@ import (
 // Запуск HTTP-сервера и работа с запросами:
 func Launch() error {
 	router := mux.NewRouter()
+
+	router.Use(logger.WithLogging)
 
 	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
 	router.HandleFunc("/{id}", handlers.RedirectHandler)
@@ -24,7 +27,6 @@ func Launch() error {
 
 	err := server.ListenAndServe()
 	if err != nil {
-		// panic(err)
 		return err
 	}
 
