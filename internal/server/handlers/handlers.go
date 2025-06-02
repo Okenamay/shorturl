@@ -10,6 +10,8 @@ import (
 	urlmaker "github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	config "github.com/Okenamay/shorturl.git/internal/config"
 	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+
+	// savefile "github.com/Okenamay/shorturl.git/internal/storage/savefile"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -40,6 +42,7 @@ func ShortenHandler(w http.ResponseWriter, r *http.Request) {
 	newURL := urlmaker.MakeFullURL(shortID)
 
 	memstorage.StoreURLIDPair(shortID, fullURL)
+	// savefile.SaveLine(shortID, fullURL)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
