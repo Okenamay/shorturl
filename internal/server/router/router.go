@@ -16,8 +16,8 @@ func Launch() error {
 	router := mux.NewRouter()
 
 	router.Use(logger.WithLogging)
-	router.Use(gzipper.Compressor)
 	router.Use(gzipper.Decompressor)
+	router.Use(gzipper.Compressor)
 
 	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
 	router.HandleFunc("/api/shorten", handlers.JSONHandler).Methods("POST")
