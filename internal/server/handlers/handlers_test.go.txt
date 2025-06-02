@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"bytes"
@@ -10,12 +10,9 @@ import (
 	"net/url"
 	"testing"
 
-	gzipper "github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	config "github.com/Okenamay/shorturl.git/internal/config"
-	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
 	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
-
-	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +93,7 @@ func TestShortenHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(handlers.ShortenHandler)
+			h := http.HandlerFunc(ShortenHandler)
 			h(w, request)
 
 			result := w.Result()
@@ -160,15 +157,15 @@ func TestRedirectHandler(t *testing.T) {
 				url:    "/" + shortID,
 			},
 			want: want{
-				code:        405,
+				code:        400,
 				response:    "",
 				contentType: "",
 			},
 		},
 	}
 
-	router := chi.NewRouter()
-	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler)
+	router := mux.NewRouter()
+	router.HandleFunc("/{id}", RedirectHandler)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -192,7 +189,7 @@ func TestRedirectHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != result.StatusCode {
+			if tt.want.code != http.StatusBadRequest {
 				require.Equal(t, originalURL, result.Header.Get("Location"))
 			}
 		})
