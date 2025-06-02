@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	gzipper "github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	config "github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
@@ -15,6 +16,8 @@ func Launch() error {
 	router := mux.NewRouter()
 
 	router.Use(logger.WithLogging)
+	router.Use(gzipper.Compressor)
+	router.Use(gzipper.Decompressor)
 
 	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
 	router.HandleFunc("/api/shorten", handlers.JSONHandler).Methods("POST")
