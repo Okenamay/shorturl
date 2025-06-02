@@ -19,12 +19,12 @@ func Launch() error {
 	noGzipR.HandleFunc("", handlers.JSONHandler).Methods("POST")
 	noGzipR.Use(logger.WithLogging)
 
-	router.Use(logger.WithLogging)
-
-	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
-	router.HandleFunc("/{id}", handlers.RedirectHandler).Methods("GET")
-	router.Use(gzipper.Decompressor)
-	router.Use(gzipper.Compressor)
+	gzipR := router.PathPrefix("/").Subrouter()
+	gzipR.HandleFunc("", handlers.ShortenHandler).Methods("POST")
+	gzipR.HandleFunc("{id}", handlers.RedirectHandler).Methods("GET")
+	gzipR.Use(logger.WithLogging)
+	gzipR.Use(gzipper.Decompressor)
+	gzipR.Use(gzipper.Compressor)
 
 	server := http.Server{
 		Addr:        config.Cfg.ServerPort,
