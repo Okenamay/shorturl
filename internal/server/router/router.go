@@ -16,11 +16,13 @@ func Launch() error {
 	router := mux.NewRouter()
 
 	router.Use(logger.WithLogging)
+
+	router.HandleFunc("/api/shorten", handlers.JSONHandler).Methods("POST")
+
 	router.Use(gzipper.Decompressor)
 	router.Use(gzipper.Compressor)
 
 	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
-	router.HandleFunc("/api/shorten", handlers.JSONHandler).Methods("POST")
 	router.HandleFunc("/{id}", handlers.RedirectHandler).Methods("GET")
 
 	server := http.Server{

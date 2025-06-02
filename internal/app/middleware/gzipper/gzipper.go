@@ -3,80 +3,83 @@ package gzipper
 import (
 	"bytes"
 	"compress/gzip"
+	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
-type gzipResponseWriter struct {
-	w       http.ResponseWriter
-	gzip    *gzip.Writer
-	buffer  *bytes.Buffer
-	written bool
+type gzipWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
 }
 
-func newGzipResponseWriter(w http.ResponseWriter) *gzipResponseWriter {
-	return &gzipResponseWriter{
-		w:       w,
-		buffer:  &bytes.Buffer{},
-		gzip:    nil,
-		written: false,
-	}
+func (w gzipWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
 }
 
-func (w *gzipResponseWriter) Header() http.Header {
-	return w.w.Header()
-}
-
-func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	if w.gzip == nil {
-		w.buffer.Write(b)
-	} else {
-		return w.gzip.Write(b)
-	}
-	return len(b), nil
-}
-
-func (w *gzipResponseWriter) WriteHeader(statusCode int) {
-	w.w.WriteHeader(statusCode)
-	w.written = true
-
-	if strings.Contains(w.w.Header().Get("Content-Type"), "text/html") ||
-		strings.Contains(w.w.Header().Get("Content-Type"), "application/json") {
-
-		w.gzip = gzip.NewWriter(w.w)
-		w.w.Header().Set("Content-Encoding", "gzip")
-	}
-}
-
-// Compressor middleware
 func Compressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sugar, _ := logger.InitLogger()
 
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			sugar.Info("Compressor. GZIP accepted")
-
-			gzw := newGzipResponseWriter(w)
-			next.ServeHTTP(gzw, r)
-
-			if gzw.gzip == nil {
-				w.Header().Del("Content-Encoding")
-				w.Write(gzw.buffer.Bytes())
+		acceptEncoding := r.Header.Values("Accept-Encoding")
+		var isGzip bool
+		for _, val := range acceptEncoding {
+			if strings.Contains(val, "gzip") {
+				isGzip = true
+				break
 			}
-		} else {
+		}
+
+		if !isGzip {
+			sugar.Info("Compressor. GZIP not accepted")
 			next.ServeHTTP(w, r)
+			return
+		}
+
+		buf := &bytes.Buffer{}
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: buf}, r)
+
+		contentType := w.Header().Get("Content-Type")
+		isJSON := strings.Contains(contentType, "application/json")
+		isHTML := strings.Contains(contentType, "text/html")
+
+		if !isJSON && !isHTML {
+			sugar.Info("Compressor. Content-Type not for compression")
+			w.Write(buf.Bytes())
+			return
+		}
+
+		w.Header().Set("Content-Encoding", "gzip")
+
+		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		if err != nil {
+			sugar.Infow("Compressor. Compression", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		defer gz.Close()
+
+		_, err = gz.Write(buf.Bytes())
+		if err != nil {
+			sugar.Infow("Compressor. gz.Write", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	})
 }
 
-// Decompressor middleware
 func Decompressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sugar, _ := logger.InitLogger()
 
-		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+		contentEncoding := r.Header.Values("Content-Encoding")
+		isGzip := slices.Contains(contentEncoding, "gzip")
+		if isGzip {
+
 			sugar.Info("Decompressor. Starting GZIP decompression")
 
 			gz, err := gzip.NewReader(r.Body)
@@ -84,6 +87,7 @@ func Decompressor(next http.Handler) http.Handler {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
 			defer gz.Close()
 
 			r.Body = gz
