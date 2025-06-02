@@ -12,7 +12,7 @@ import (
 )
 
 type record struct {
-	Uuid        string `json:"uuid"`
+	UUID        string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }
@@ -30,7 +30,7 @@ func SaveFile() error {
 	count := 1
 	for shortID, fullURL := range memstorage.URLStore {
 		rec := record{
-			Uuid:        strconv.Itoa(count),
+			UUID:        strconv.Itoa(count),
 			ShortURL:    shortID,
 			OriginalURL: fullURL,
 		}
@@ -107,7 +107,7 @@ func LoadFile() error {
 
 // 	// Создаём запись
 // 	rec := record{
-// 		Uuid: uuid,
+// 		UUID: uuid,
 // 		ShortURL: shortID,
 // 		OriginalURL: fullURL,
 // 	}
