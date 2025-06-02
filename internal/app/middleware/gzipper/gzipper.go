@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
@@ -16,37 +15,33 @@ type gzipWriter struct {
 	Writer io.Writer
 }
 
-func (w gzipWriter) Write(b []byte) (int, error) {
+// Реализуем все методы интерфейса ResponseWriter
+func (w *gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
+func (w *gzipWriter) Header() http.Header {
+	return w.ResponseWriter.Header()
+}
+
+// Compressor middleware
 func Compressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sugar, _ := logger.InitLogger()
 
-		acceptEncoding := r.Header.Values("Accept-Encoding")
-		var isGzip bool
-		for _, val := range acceptEncoding {
-			if strings.Contains(val, "gzip") {
-				isGzip = true
-				break
-			}
-		}
-
-		if !isGzip {
+		acceptEncoding := r.Header.Get("Accept-Encoding")
+		if !strings.Contains(acceptEncoding, "gzip") {
 			sugar.Info("Compressor. GZIP not accepted")
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		buf := &bytes.Buffer{}
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: buf}, r)
+		next.ServeHTTP(&gzipWriter{ResponseWriter: w, Writer: buf}, r)
 
 		contentType := w.Header().Get("Content-Type")
-		isJSON := strings.Contains(contentType, "application/json")
-		isHTML := strings.Contains(contentType, "text/html")
-
-		if !isJSON && !isHTML {
+		if !strings.Contains(contentType, "application/json") &&
+			!strings.Contains(contentType, "text/html") {
 			sugar.Info("Compressor. Content-Type not for compression")
 			w.Write(buf.Bytes())
 			return
@@ -60,7 +55,6 @@ func Compressor(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		defer gz.Close()
 
 		_, err = gz.Write(buf.Bytes())
@@ -72,14 +66,13 @@ func Compressor(next http.Handler) http.Handler {
 	})
 }
 
+// Decompressor middleware
 func Decompressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sugar, _ := logger.InitLogger()
 
-		contentEncoding := r.Header.Values("Content-Encoding")
-		isGzip := slices.Contains(contentEncoding, "gzip")
-		if isGzip {
-			var reader io.ReadCloser
+		contentEncoding := r.Header.Get("Content-Encoding")
+		if contentEncoding == "gzip" {
 			sugar.Info("Decompressor. Starting GZIP decompression")
 
 			gz, err := gzip.NewReader(r.Body)
@@ -87,11 +80,9 @@ func Decompressor(next http.Handler) http.Handler {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-
 			defer gz.Close()
 
-			reader = gz
-			r.Body = reader
+			r.Body = gz
 		}
 
 		next.ServeHTTP(w, r)
