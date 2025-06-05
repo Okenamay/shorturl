@@ -3,26 +3,27 @@ package main
 import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	router "github.com/Okenamay/shorturl.git/internal/server/router"
+	"github.com/Okenamay/shorturl.git/internal/server/router"
 	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
-
-	_ "go.uber.org/zap"
 )
 
 // Main:
 func main() {
-	config.ParseFlags()
+	conf := config.ParseFlags()
 
 	sugar, err := logger.InitLogger()
 	if err != nil {
 		sugar.Fatalw(err.Error(), "Main", "Start logger")
 	}
 
-	savefile.LoadFile()
+	err = savefile.LoadFile(conf)
+	if err != nil {
+		sugar.Fatalw(err.Error(), "Main", "Load savefile")
+	}
 
-	sugar.Infow("Starting server on port: ", config.Cfg.ServerPort)
+	sugar.Infow("Starting server on port: ", conf.ServerPort)
 
-	err = router.Launch()
+	err = router.Launch(conf)
 	if err != nil {
 		sugar.Fatalw(err.Error(), "Main", "Start server")
 	}

@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	config "github.com/Okenamay/shorturl.git/internal/config"
-	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	"github.com/Okenamay/shorturl.git/internal/config"
+	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 )
 
 type record struct {
@@ -18,8 +18,8 @@ type record struct {
 }
 
 // SaveFile записывает всё содержимое memstorage.URLStore в файл
-func SaveFile() error {
-	file, err := os.OpenFile(config.Cfg.SaveFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+func SaveFile(conf config.Cfg) error {
+	file, err := os.OpenFile(conf.SaveFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("ошибка создания файла: %w", err)
 	}
@@ -49,8 +49,8 @@ func SaveFile() error {
 }
 
 // LoadFile загружает данные из файла в memstorage.URLStore
-func LoadFile() error {
-	data, err := os.ReadFile(config.Cfg.SaveFilePath)
+func LoadFile(conf config.Cfg) error {
+	data, err := os.ReadFile(conf.SaveFilePath)
 	if err != nil {
 		return fmt.Errorf("ошибка чтения файла: %w", err)
 	}

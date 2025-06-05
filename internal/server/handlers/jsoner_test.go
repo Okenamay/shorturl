@@ -2,32 +2,27 @@ package handlers
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	urlmaker "github.com/Okenamay/shorturl.git/internal/app/urlmaker"
-	config "github.com/Okenamay/shorturl.git/internal/config"
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
-	"github.com/gorilla/mux"
+	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
+	"github.com/Okenamay/shorturl.git/internal/config"
+	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestJSONHandler(t *testing.T) {
-	config.ParseFlags()
+	conf := config.ParseFlags()
+
 	memstorage.URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
-	hash := md5.New()
-	io.WriteString(hash, originalURL)
-	shortID := hex.EncodeToString(hash.Sum(nil))[:config.Cfg.ShortIDLen]
+	result, shortID := urlmaker.ProcessURL(conf, originalURL)
 	memstorage.URLStore[shortID] = originalURL
-	result := urlmaker.MakeFullURL(shortID)
 
 	type want struct {
 		code        int
@@ -67,16 +62,14 @@ func TestJSONHandler(t *testing.T) {
 				body:   JSONRequest{},
 			},
 			want: want{
-				code:        400,
+				code:        405,
 				contentType: "",
 			},
 		},
 	}
 
-	router := mux.NewRouter()
-	router.Use(logger.WithLogging)
-
-	router.HandleFunc("/api/shorten", JSONHandler)
+	router := chi.NewRouter()
+	router.Post("/api/shorten", JSONHandler(conf))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -84,8 +77,8 @@ func TestJSONHandler(t *testing.T) {
 			defer ts.Close()
 
 			body, _ := json.Marshal(tt.request.body)
-			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(body))
-
+			request := httptest.NewRequest(tt.request.method, tt.request.url, nil)
+			request.Body = io.NopCloser(bytes.NewReader(body))
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, request)
 
@@ -95,7 +88,7 @@ func TestJSONHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != http.StatusBadRequest {
+			if tt.want.code != http.StatusBadRequest && tt.want.code != http.StatusMethodNotAllowed {
 				newURL, err := io.ReadAll(result.Body)
 				require.NoError(t, err)
 				err = result.Body.Close()

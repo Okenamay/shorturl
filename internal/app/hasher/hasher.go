@@ -9,11 +9,11 @@ import (
 )
 
 // Кодирование строки с URL в md5-сумму с обрезанием до ShortIDLen символов:
-func ShortenURL(fullURL string) string {
+func ShortenURL(conf config.Cfg, fullURL string) string {
 	hash := md5.New()
 	io.WriteString(hash, fullURL)
 
 	shortID := hex.EncodeToString(hash.Sum(nil))
 
-	return shortID[:config.Cfg.ShortIDLen]
+	return shortID[:conf.ShortIDLen]
 }
