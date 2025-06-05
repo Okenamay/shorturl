@@ -12,7 +12,7 @@ import (
 )
 
 // Запуск HTTP-сервера и работа с запросами:
-func Launch(conf config.Cfg) error {
+func Launch(conf *config.Cfg) error {
 	router := chi.NewRouter()
 
 	router.Use(logger.WithLogging)

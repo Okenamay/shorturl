@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
@@ -18,7 +19,15 @@ type record struct {
 }
 
 // SaveFile записывает всё содержимое memstorage.URLStore в файл
-func SaveFile(conf config.Cfg) error {
+func SaveFile(conf *config.Cfg) error {
+	dirPath := filepath.Dir(conf.SaveFilePath)
+
+	// Create the directory path if it doesn't exist
+	err := os.MkdirAll(dirPath, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	file, err := os.OpenFile(conf.SaveFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("ошибка создания файла: %w", err)
@@ -49,7 +58,7 @@ func SaveFile(conf config.Cfg) error {
 }
 
 // LoadFile загружает данные из файла в memstorage.URLStore
-func LoadFile(conf config.Cfg) error {
+func LoadFile(conf *config.Cfg) error {
 	data, err := os.ReadFile(conf.SaveFilePath)
 	if err != nil {
 		return fmt.Errorf("ошибка чтения файла: %w", err)

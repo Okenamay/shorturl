@@ -22,7 +22,7 @@ type JSONResponse struct {
 }
 
 // Обработка запроса на переход по JSON-запросу:
-func JSONHandler(conf config.Cfg) http.HandlerFunc {
+func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sugar, _ := logger.InitLogger()
 		sugar.Info("JSONHandler. Start")

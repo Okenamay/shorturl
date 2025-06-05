@@ -5,11 +5,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
-	"github.com/Okenamay/shorturl.git/internal/config"
+	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
+	config "github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/server/handlers"
+	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +20,7 @@ import (
 )
 
 func TestShortenHandler(t *testing.T) {
-	conf := config.ParseFlags()
+	conf := config.InitConfig()
 
 	type want struct {
 		code        int
@@ -120,84 +123,84 @@ func TestShortenHandler(t *testing.T) {
 	}
 }
 
-// func TestRedirectHandler(t *testing.T) {
-// 	conf := config.ParseFlags()
+func TestRedirectHandler(t *testing.T) {
+	conf := config.InitConfig()
 
-// 	memstorage.URLStore = make(map[string]string)
-// 	originalURL := "https://topdeck.ru/"
-// 	_, shortID := urlmaker.ProcessURL(conf, originalURL)
-// 	memstorage.URLStore[shortID] = originalURL
+	memstorage.URLStore = make(map[string]string)
+	originalURL := "https://topdeck.ru/"
+	_, shortID := urlmaker.ProcessURL(conf, originalURL)
+	memstorage.URLStore[shortID] = originalURL
 
-// 	type want struct {
-// 		code        int
-// 		response    string
-// 		contentType string
-// 	}
+	type want struct {
+		code        int
+		response    string
+		contentType string
+	}
 
-// 	type request struct {
-// 		method string
-// 		url    string
-// 	}
+	type request struct {
+		method string
+		url    string
+	}
 
-// 	tests := []struct {
-// 		name    string
-// 		request request
-// 		want    want
-// 	}{
-// 		{
-// 			name: "RedirectHandler_Correct_Method",
-// 			request: request{
-// 				method: http.MethodGet,
-// 				url:    "/" + shortID,
-// 			},
-// 			want: want{
-// 				code:        307,
-// 				response:    originalURL,
-// 				contentType: "text/plain",
-// 			},
-// 		},
-// 		{
-// 			name: "RedirectHandler_Wrong_Method",
-// 			request: request{
-// 				method: http.MethodPost,
-// 				url:    "/" + shortID,
-// 			},
-// 			want: want{
-// 				code:        405,
-// 				response:    "",
-// 				contentType: "",
-// 			},
-// 		},
-// 	}
+	tests := []struct {
+		name    string
+		request request
+		want    want
+	}{
+		{
+			name: "RedirectHandler_Correct_Method",
+			request: request{
+				method: http.MethodGet,
+				url:    "/" + shortID,
+			},
+			want: want{
+				code:        307,
+				response:    originalURL,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name: "RedirectHandler_Wrong_Method",
+			request: request{
+				method: http.MethodPost,
+				url:    "/" + shortID,
+			},
+			want: want{
+				code:        405,
+				response:    "",
+				contentType: "",
+			},
+		},
+	}
 
-// 	router := chi.NewRouter()
-// 	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
+	router := chi.NewRouter()
+	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			ts := httptest.NewServer(router)
-// 			defer ts.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := httptest.NewServer(router)
+			defer ts.Close()
 
-// 			fullURL := ts.URL + tt.request.url
+			fullURL := ts.URL + tt.request.url
 
-// 			parsedURL, err := url.Parse(fullURL)
-// 			require.NoError(t, err)
+			parsedURL, err := url.Parse(fullURL)
+			require.NoError(t, err)
 
-// 			request := httptest.NewRequest(tt.request.method, fullURL, nil)
-// 			request.URL = parsedURL
+			request := httptest.NewRequest(tt.request.method, fullURL, nil)
+			request.URL = parsedURL
 
-// 			w := httptest.NewRecorder()
-// 			router.ServeHTTP(w, request)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, request)
 
-// 			result := w.Result()
-// 			result.Body.Close()
+			result := w.Result()
+			result.Body.Close()
 
-// 			require.Equal(t, tt.want.code, result.StatusCode)
-// 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
+			require.Equal(t, tt.want.code, result.StatusCode)
+			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-// 			if tt.want.code != result.StatusCode {
-// 				require.Equal(t, originalURL, result.Header.Get("Location"))
-// 			}
-// 		})
-// 	}
-// }
+			if tt.want.code != result.StatusCode {
+				require.Equal(t, originalURL, result.Header.Get("Location"))
+			}
+		})
+	}
+}

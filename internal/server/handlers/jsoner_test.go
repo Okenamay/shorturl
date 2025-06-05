@@ -17,7 +17,7 @@ import (
 )
 
 func TestJSONHandler(t *testing.T) {
-	conf := config.ParseFlags()
+	conf := config.InitConfig()
 
 	memstorage.URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"

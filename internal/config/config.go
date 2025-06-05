@@ -22,9 +22,13 @@ type Cfg struct {
 	SaveFilePath      string
 }
 
-var config Cfg
+var config *Cfg
 
-func ParseFlags() Cfg {
+func parseFlags() {
+	if config == nil {
+		config = &Cfg{}
+	}
+
 	flag.IntVar(&config.ShortIDLen, "l", ShortIDLen,
 		"Длина короткого ID – целое число от 8 до 32")
 	flag.IntVar(&config.IdleTimeout, "t", IdleTimeout,
@@ -48,6 +52,13 @@ func ParseFlags() Cfg {
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
 	}
+}
 
+func InitConfig() *Cfg {
+	if config != nil {
+		return config
+	}
+
+	parseFlags()
 	return config
 }

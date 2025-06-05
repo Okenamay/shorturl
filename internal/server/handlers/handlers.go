@@ -14,7 +14,7 @@ import (
 )
 
 // Обработка запросов на сокращение URL:
-func ShortenHandler(conf config.Cfg) http.HandlerFunc {
+func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		queryBody, err := io.ReadAll(r.Body)
@@ -48,7 +48,7 @@ func ShortenHandler(conf config.Cfg) http.HandlerFunc {
 }
 
 // Обработка запроса на переход по полному URL:
-func RedirectHandler(conf config.Cfg) http.HandlerFunc {
+func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		queryID := chi.URLParam(r, "id")

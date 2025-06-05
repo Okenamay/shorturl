@@ -9,7 +9,7 @@ import (
 
 // Main:
 func main() {
-	conf := config.ParseFlags()
+	conf := config.InitConfig()
 
 	sugar, err := logger.InitLogger()
 	if err != nil {
