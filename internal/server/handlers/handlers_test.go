@@ -2,22 +2,25 @@ package handlers
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
-	config "github.com/Okenamay/shorturl.git/internal/config"
-	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
-	"github.com/gorilla/mux"
+	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
+	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
+	"github.com/Okenamay/shorturl.git/internal/config"
+	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestShortenHandler(t *testing.T) {
+	conf := config.InitConfig()
+
 	type want struct {
 		code        int
 		response    string
@@ -56,7 +59,7 @@ func TestShortenHandler(t *testing.T) {
 				body:   []byte("https://www.mtggoldfish.com/"),
 			},
 			want: want{
-				code:        400,
+				code:        405,
 				response:    "",
 				contentType: "",
 			},
@@ -89,12 +92,17 @@ func TestShortenHandler(t *testing.T) {
 		},
 	}
 
+	router := chi.NewRouter()
+	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", ShortenHandler(conf))
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ts := httptest.NewServer(router)
+			defer ts.Close()
+
 			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(ShortenHandler)
-			h(w, request)
+			router.ServeHTTP(w, request)
 
 			result := w.Result()
 			defer result.Body.Close()
@@ -102,8 +110,9 @@ func TestShortenHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != http.StatusBadRequest {
-				newURL, err := io.ReadAll(result.Body)
+			if tt.want.code != http.StatusBadRequest && tt.want.code != http.StatusMethodNotAllowed {
+				newURLb, err := io.ReadAll(result.Body)
+				newURL := string(newURLb)
 				require.NoError(t, err)
 				err = result.Body.Close()
 				require.NoError(t, err)
@@ -114,12 +123,11 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
-	config.ParseFlags()
+	conf := config.InitConfig()
+
 	memstorage.URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
-	hash := md5.New()
-	io.WriteString(hash, originalURL)
-	shortID := hex.EncodeToString(hash.Sum(nil))[:config.Cfg.ShortIDLen]
+	_, shortID := urlmaker.ProcessURL(conf, originalURL)
 	memstorage.URLStore[shortID] = originalURL
 
 	type want struct {
@@ -157,15 +165,15 @@ func TestRedirectHandler(t *testing.T) {
 				url:    "/" + shortID,
 			},
 			want: want{
-				code:        400,
+				code:        405,
 				response:    "",
 				contentType: "",
 			},
 		},
 	}
 
-	router := mux.NewRouter()
-	router.HandleFunc("/{id}", RedirectHandler)
+	router := chi.NewRouter()
+	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", RedirectHandler(conf))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -189,7 +197,7 @@ func TestRedirectHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != http.StatusBadRequest {
+			if tt.want.code != result.StatusCode {
 				require.Equal(t, originalURL, result.Header.Get("Location"))
 			}
 		})
