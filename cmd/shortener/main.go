@@ -18,7 +18,7 @@ func main() {
 
 	err = savefile.LoadFile(conf)
 	if err != nil {
-		sugar.Fatalw(err.Error(), "Main", "Load savefile")
+		sugar.Errorw(err.Error(), "Main", "Load savefile")
 	}
 
 	sugar.Infow("Starting server on port: ", conf.ServerPort)
