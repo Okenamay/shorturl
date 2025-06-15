@@ -4,7 +4,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/router"
-	dbase "github.com/Okenamay/shorturl.git/internal/storage/database"
+	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
 )
 
@@ -22,7 +22,7 @@ func main() {
 		sugar.Errorw(err.Error(), "Main", "Load savefile")
 	}
 
-	if err := dbase.Init(conf); err != nil {
+	if err := database.Init(conf); err != nil {
 		sugar.Fatalw("Failed to initialize database", "error", err)
 	}
 

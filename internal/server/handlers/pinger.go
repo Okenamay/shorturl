@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
+	"github.com/Okenamay/shorturl.git/internal/storage/database"
 )
 
 // PingHandler проверяет соединение с базой данных и отвечает на пинг:
@@ -15,7 +17,7 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 
 		// Проверяем подключение к БД
 		sugar.Info("PingHandler. тест 0")
-		// err := dbase.DBPool.Ping(context.Background())
+		database.DBPool.Ping(context.Background())
 		// sugar.Info("PingHandler. тест 1")
 		// if err != nil {
 		// 	sugar.Info("PingHandler. тест 2")
