@@ -17,14 +17,14 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 
 		// Проверяем подключение к БД
 		sugar.Info("PingHandler. тест 0")
-		database.DBPool.Ping(context.Background())
-		// sugar.Info("PingHandler. тест 1")
-		// if err != nil {
-		// 	sugar.Info("PingHandler. тест 2")
-		// 	sugar.Errorw("PingHandler. DB ping error", "error", err)
-		// 	http.Error(w, "Database connection error", http.StatusInternalServerError)
-		// 	return
-		// }
+		err := database.DBPool.Ping(context.Background())
+		sugar.Info("PingHandler. тест 1")
+		if err != nil {
+			sugar.Info("PingHandler. тест 2")
+			sugar.Errorw("PingHandler. DB ping error", "error", err)
+			http.Error(w, "Database connection error", http.StatusInternalServerError)
+			return
+		}
 
 		sugar.Info("PingHandler. тест 3")
 		w.WriteHeader(http.StatusOK)

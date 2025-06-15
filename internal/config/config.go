@@ -7,12 +7,12 @@ import (
 
 // Дефолтные значения до применения флагов:
 const (
-	ShortIDLen        = 10                                                           // Длина короткого идентификатора
-	IdleTimeout       = 600                                                          // Таймаут сервера в секундах
-	ServerPort        = ":8080"                                                      // Адрес и порт сервера
-	ShortIDServerPort = "http://localhost:8080"                                      // Адрес и порт для коротких ID
-	SaveFile          = "/tmp/short-url-db.json"                                     // Имя файла-хранилища
-	PostgreDSN        = "postgres://tester:1234@localhost:5432/pgdb?sslmode=disable" // DSN по умолчанию
+	ShortIDLen        = 10                                           // Длина короткого идентификатора
+	IdleTimeout       = 600                                          // Таймаут сервера в секундах
+	ServerPort        = ":8080"                                      // Адрес и порт сервера
+	ShortIDServerPort = "http://localhost:8080"                      // Адрес и порт для коротких ID
+	SaveFile          = "/tmp/short-url-db.json"                     // Имя файла-хранилища
+	PostgreDSN        = "postgres://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
 )
 
 type Cfg struct {
