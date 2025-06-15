@@ -26,6 +26,11 @@ func main() {
 		sugar.Fatalw("Failed to initialize database", "error", err)
 	}
 
+	if database.DBPool == nil {
+		sugar.Fatal("Database pool is not initialized")
+		return
+	}
+
 	sugar.Infow("Starting server on port: ", conf.ServerPort)
 
 	err = router.Launch(conf)
