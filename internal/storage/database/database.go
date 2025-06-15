@@ -22,7 +22,12 @@ func Init(conf *config.Cfg) error {
 		return err
 	}
 	fmt.Println(DBPool)
+
+	return nil
+}
+
+func Close() {
+	sugar, _ := logger.InitLogger()
 	sugar.Info("DB Init. Defer Close")
 	defer DBPool.Close()
-	return nil
 }
