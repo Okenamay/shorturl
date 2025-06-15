@@ -4,21 +4,22 @@ import (
 	"net/http"
 	"time"
 
+	gzipper "github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	config "github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // Запуск HTTP-сервера и работа с запросами:
 func Launch() error {
-	router := mux.NewRouter()
+	router := chi.NewRouter()
 
 	router.Use(logger.WithLogging)
 
-	router.HandleFunc("/", handlers.ShortenHandler).Methods("POST")
-	router.HandleFunc("/api/shorten", handlers.JSONHandler).Methods("POST")
-	router.HandleFunc("/{id}", handlers.RedirectHandler).Methods("GET")
+	router.Post("/api/shorten", handlers.JSONHandler)
+	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", handlers.ShortenHandler)
+	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler)
 
 	server := http.Server{
 		Addr:        config.Cfg.ServerPort,

@@ -10,7 +10,7 @@ import (
 	urlmaker "github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	config "github.com/Okenamay/shorturl.git/internal/config"
 	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 // Обработка запросов на сокращение URL:
@@ -53,8 +53,7 @@ func RedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vars := mux.Vars(r)
-	queryID := vars["id"]
+	queryID := chi.URLParam(r, "id")
 
 	if len(queryID) != config.Cfg.ShortIDLen {
 		http.Error(w, emsg.ErrorInvalidShortID.Error(), http.StatusNotFound)

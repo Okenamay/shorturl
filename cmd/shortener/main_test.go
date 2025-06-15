@@ -10,11 +10,12 @@ import (
 	"net/url"
 	"testing"
 
+	gzipper "github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	config "github.com/Okenamay/shorturl.git/internal/config"
 	handlers "github.com/Okenamay/shorturl.git/internal/server/handlers"
 	memstorage "github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -159,15 +160,15 @@ func TestRedirectHandler(t *testing.T) {
 				url:    "/" + shortID,
 			},
 			want: want{
-				code:        400,
+				code:        405,
 				response:    "",
 				contentType: "",
 			},
 		},
 	}
 
-	router := mux.NewRouter()
-	router.HandleFunc("/{id}", handlers.RedirectHandler)
+	router := chi.NewRouter()
+	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -191,7 +192,7 @@ func TestRedirectHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != http.StatusBadRequest {
+			if tt.want.code != result.StatusCode {
 				require.Equal(t, originalURL, result.Header.Get("Location"))
 			}
 		})
