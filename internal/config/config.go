@@ -12,7 +12,7 @@ const (
 	ServerPort        = ":8080"                                                      // Адрес и порт сервера
 	ShortIDServerPort = "http://localhost:8080"                                      // Адрес и порт для коротких ID
 	SaveFile          = "/tmp/short-url-db.json"                                     // Имя файла-хранилища
-	PostgreDSN        = "postgres://tester:1234@localhost:5435/pgdb?sslmode=disable" // DSN по умолчанию
+	PostgreDSN        = "postgres://tester:1234@localhost:5432/pgdb?sslmode=disable" // DSN по умолчанию
 )
 
 type Cfg struct {

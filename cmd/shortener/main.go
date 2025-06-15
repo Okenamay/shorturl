@@ -23,7 +23,7 @@ func main() {
 	}
 
 	if err := dbase.Init(conf); err != nil {
-		sugar.Errorw(err.Error(), "Main", "Init database")
+		sugar.Fatalw("Failed to initialize database", "error", err)
 	}
 
 	sugar.Infow("Starting server on port: ", conf.ServerPort)
