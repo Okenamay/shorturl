@@ -6,7 +6,7 @@ import (
 
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/Okenamay/shorturl.git/internal/storage/database"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PingHandler проверяет соединение с базой данных и отвечает на пинг:
@@ -17,7 +17,16 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 
 		// Проверяем подключение к БД
 		sugar.Info("PingHandler. тест 0")
-		err := database.DBPool.Ping(context.Background())
+		// err := database.DBPool.Ping(context.Background())
+		DBPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
+		if err != nil {
+			sugar.Info("PingHandler. тест 5")
+			sugar.Errorw("PingHandler. DB pool error", "error", err)
+			http.Error(w, "Database connection error", http.StatusInternalServerError)
+			return
+		}
+
+		err = DBPool.Ping(context.Background())
 		sugar.Info("PingHandler. тест 1")
 		if err != nil {
 			sugar.Info("PingHandler. тест 2")
