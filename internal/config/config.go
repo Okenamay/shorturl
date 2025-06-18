@@ -72,20 +72,18 @@ func parseFlags() {
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
 		sugar.Infof("EnvFilePath = %s", saveFilePath)
-		useFile = true
 	}
 
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
 		sugar.Infof("EnvDSN = %s", postgreDSN)
-		useDSN = true
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
 	// проверять будем по порядку:
-	if useDSN {
+	if config.PostgreDSN != "" {
 		config.MemMode = "postgres"
-	} else if useFile {
+	} else if config.SaveFilePath != "" {
 		config.MemMode = "savefile"
 	} else {
 		config.MemMode = "memstore"
