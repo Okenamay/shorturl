@@ -22,7 +22,6 @@ type record struct {
 func SaveFile(conf *config.Cfg) error {
 	dirPath := filepath.Dir(conf.SaveFilePath)
 
-	// Create the directory path if it doesn't exist
 	err := os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)

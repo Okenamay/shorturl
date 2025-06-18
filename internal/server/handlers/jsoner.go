@@ -10,7 +10,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
 type JSONRequest struct {
@@ -54,7 +54,11 @@ func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 
 		newURL, shortID := urlmaker.ProcessURL(conf, fullURL)
 
-		memstorage.StoreURLIDPair(shortID, fullURL)
+		err = memselect.StorePair(conf, shortID, fullURL)
+		if err != nil {
+			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		response := JSONResponse{
 			Result: newURL,

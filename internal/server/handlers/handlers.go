@@ -8,8 +8,8 @@ import (
 	emsg "github.com/Okenamay/shorturl.git/internal/app/errmsg"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
-	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
-	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
+	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -34,8 +34,7 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 
 		newURL, shortID := urlmaker.ProcessURL(conf, fullURL)
 
-		memstorage.StoreURLIDPair(shortID, fullURL)
-		err = savefile.SaveFile(conf)
+		err = memselect.StorePair(conf, shortID, fullURL)
 		if err != nil {
 			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
 			return
@@ -50,6 +49,8 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 // Обработка запроса на переход по полному URL:
 func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		sugar, _ := logger.InitLogger()
+		sugar.Info("RedirectHandler. Start")
 
 		queryID := chi.URLParam(r, "id")
 
@@ -58,9 +59,14 @@ func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		fullURL, exists := memstorage.URLStore[queryID]
+		fullURL, err := memselect.CheckPair(conf, queryID)
+		if err != nil {
+			sugar.Errorw("RedirectHandler. Failed to check URL/ShortID pair", "error", err)
+			return
+		}
 
-		if !exists {
+		if fullURL == "" {
+			sugar.Errorw("RedirectHandler. Failed to find URL/ShortID pair", "error", err)
 			http.Error(w, emsg.ErrorNotInDB.Error(), http.StatusInternalServerError)
 			return
 		}

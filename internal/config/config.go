@@ -22,6 +22,7 @@ type Cfg struct {
 	ShortIDServerPort string
 	SaveFilePath      string
 	PostgreDSN        string
+	MemMode           string
 }
 
 var config *Cfg
@@ -39,9 +40,13 @@ func parseFlags() {
 		"Адрес запуска сервера в формате host:port или :port")
 	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDServerPort,
 		"Адрес коротких ID в формате host:port/path")
-	flag.StringVar(&config.SaveFilePath, "f", SaveFile,
+	// Сделали дефолтным значением SaveFilePath "" – если флагом или переменной среды
+	// не задали значение, то никуда не будем писать:
+	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
-	flag.StringVar(&config.PostgreDSN, "d", PostgreDSN,
+	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
+	// не задали значение, то DSN будет пустой:
+	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
 	flag.Parse()
 
@@ -59,6 +64,16 @@ func parseFlags() {
 
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
+	}
+
+	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
+	// проверять будем по порядку:
+	if config.PostgreDSN != "" {
+		config.MemMode = "postgres"
+	} else if config.SaveFilePath != "" {
+		config.MemMode = "savefile"
+	} else {
+		config.MemMode = "memstore"
 	}
 }
 
