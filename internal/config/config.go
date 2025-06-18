@@ -92,8 +92,8 @@ func parseFlags() {
 	}
 
 	sugar.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. ",
-		"useDSN: %v. useFile: %v. saveFilePath: %s. ",
-		"postgreDSN: %v.",
+		"useDSN: %b. useFile: %b. saveFilePath: %s. ",
+		"postgreDSN: %s.",
 		config.SaveFilePath, config.PostgreDSN, useDSN, useFile,
 		saveFilePath, postgreDSN)
 }
