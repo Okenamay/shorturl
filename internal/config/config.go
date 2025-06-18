@@ -91,8 +91,8 @@ func parseFlags() {
 		config.MemMode = "memstore"
 	}
 
-	sugar.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. ",
-		"useDSN: %b. useFile: %b. saveFilePath: %s. ",
+	sugar.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
+		"useDSN: %t. useFile: %t. saveFilePath: %s. "+
 		"postgreDSN: %s.",
 		config.SaveFilePath, config.PostgreDSN, useDSN, useFile,
 		saveFilePath, postgreDSN)
