@@ -15,13 +15,15 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 		sugar.Info("PingHandler. Start")
 
 		err, pingOK := memselect.PingDB(conf)
-		if err != nil {
+		if err == nil {
+			sugar.Info("PingHandler. DB ping success")
+		} else if err != nil {
 			sugar.Errorw("PingHandler. DB ping error", "error", err)
 			http.Error(w, "Database connection error", http.StatusInternalServerError)
 			return
 		}
 		if !pingOK {
-			sugar.Errorw("PingHandler. DB ping error", "error", err)
+			sugar.Errorw("PingHandler. DB ping failed", "error", err)
 			http.Error(w, "Database not enabled", http.StatusInternalServerError)
 			return
 		}
