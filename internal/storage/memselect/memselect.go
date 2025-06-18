@@ -104,21 +104,9 @@ func CheckPair(conf *config.Cfg, queryID string) (string, error) {
 		return "", err
 	}
 
-	// Хотим читать из нужного источника, но зачем, если всё равно при
-	// инициализации всё в мапу считали? Или обязательно?
-
-	// switch conf.MemMode {
-	// case "postgres":
-	// 	fullURL, err = database.CheckOne(conf, queryID)
-	// 	if err != nil {
-	// 		sugar.Errorw(err.Error(), "CheckOne", "Check DB")
-	// 		return "", err
-	// 	}
-	// 	sugar.Info("CheckOne", "DB check OK")
-	// default:
-	// 	fullURL, exists = memstorage.URLStore[queryID]
-	// 	sugar.Info("CheckOne", "Mem check OK")
-	// }
+	// В теории, мы хотим читать из нужного источника, но зачем,
+	// если всё равно при инициализации всё в мапу считали?
+	// Или таки обязательно?
 
 	fullURL := memstorage.URLStore[queryID]
 

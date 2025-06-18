@@ -125,25 +125,3 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 
 	return nil
 }
-
-// 	// Проверим на наличие
-// }
-
-// func Init(conf *config.Cfg) error {
-// 	sugar, _ := logger.InitLogger()
-// 	sugar.Info("DB Init. Start")
-// 	DBPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
-// 	sugar.Info("DB Init. Make Pool")
-// 	if err != nil {
-// 		return err
-// 	}
-// 	fmt.Println(DBPool)
-// 	defer DBPool.Close()
-// 	return nil
-// }
-
-// func Close() {
-// 	sugar, _ := logger.InitLogger()
-// 	sugar.Info("DB Init. Defer Close")
-// 	defer DBPool.Close()
-// }
