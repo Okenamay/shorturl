@@ -3,6 +3,8 @@ package config
 import (
 	"flag"
 	"os"
+
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
 // Дефолтные значения до применения флагов:
@@ -30,6 +32,11 @@ var useFile bool
 var useDSN bool
 
 func parseFlags() {
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "Main", "Start logger")
+	}
+
 	if config == nil {
 		config = &Cfg{}
 	}
@@ -62,11 +69,13 @@ func parseFlags() {
 
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
+		sugar.Infof("EnvFilePath = %s", saveFilePath)
 		useFile = true
 	}
 
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
+		sugar.Infof("EnvDSN = %s", postgreDSN)
 		useDSN = true
 	}
 
