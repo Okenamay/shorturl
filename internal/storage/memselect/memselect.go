@@ -26,7 +26,7 @@ func MemInit(conf *config.Cfg) error {
 	case "savefile":
 		err := savefile.LoadFile(conf)
 		if err != nil {
-			sugar.Fatalw(err.Error(), "MemInit", "Load savefile")
+			sugar.Errorw(err.Error(), "MemInit", "Load savefile")
 			return err
 		}
 		sugar.Info("MemInit", "Load savefile OK")

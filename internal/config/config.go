@@ -44,11 +44,11 @@ func parseFlags() {
 		"Адрес коротких ID в формате host:port/path")
 	// Сделали дефолтным значением SaveFilePath "" – если флагом или переменной среды
 	// не задали значение, то никуда не будем писать:
-	flag.StringVar(&config.SaveFilePath, "f", SaveFile,
+	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
 	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
 	// не задали значение, то DSN будет пустой:
-	flag.StringVar(&config.PostgreDSN, "d", PostgreDSN,
+	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
 	flag.Parse()
 
