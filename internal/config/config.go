@@ -26,6 +26,8 @@ type Cfg struct {
 }
 
 var config *Cfg
+var useFile bool
+var useDSN bool
 
 func parseFlags() {
 	if config == nil {
@@ -60,17 +62,19 @@ func parseFlags() {
 
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
+		useFile = true
 	}
 
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
+		useDSN = true
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
 	// проверять будем по порядку:
-	if config.PostgreDSN != "" {
+	if useDSN {
 		config.MemMode = "postgres"
-	} else if config.SaveFilePath != "" {
+	} else if useFile {
 		config.MemMode = "savefile"
 	} else {
 		config.MemMode = "memstore"
