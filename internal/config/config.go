@@ -53,12 +53,12 @@ func parseFlags() {
 	// не задали значение, то никуда не будем писать:
 	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
-	sugar.Infof("FlagFilePath = %s", config.SaveFilePath)
+	sugar.Infof("FlagFilePath = %s", &config.SaveFilePath)
 	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
 	// не задали значение, то DSN будет пустой:
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
-	sugar.Infof("FlagDSN = %s", config.PostgreDSN)
+	sugar.Infof("FlagDSN = %s", &config.PostgreDSN)
 	flag.Parse()
 
 	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
