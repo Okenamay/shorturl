@@ -11,7 +11,7 @@ import (
 func MemInit(conf *config.Cfg) error {
 	sugar, err := logger.InitLogger()
 	if err != nil {
-		sugar.Fatalw(err.Error(), "MemInit", "Start logger")
+		sugar.Errorw(err.Error(), "MemInit", "Start logger")
 		return err
 	}
 
@@ -19,7 +19,7 @@ func MemInit(conf *config.Cfg) error {
 	case "postgres":
 		err = database.StartDB(conf)
 		if err != nil {
-			sugar.Fatalw(err.Error(), "MemInit", "Init DB")
+			sugar.Errorw(err.Error(), "MemInit", "Init DB")
 			return err
 		}
 		sugar.Info("MemInit", "Init DB OK")
@@ -44,7 +44,7 @@ var pingOK bool
 func PingDB(conf *config.Cfg) (error, bool) {
 	sugar, err := logger.InitLogger()
 	if err != nil {
-		sugar.Fatalw(err.Error(), "PingDB", "Start logger")
+		sugar.Errorw(err.Error(), "PingDB", "Start logger")
 		return err, pingOK
 	}
 
@@ -52,7 +52,7 @@ func PingDB(conf *config.Cfg) (error, bool) {
 	case "postgres":
 		err = database.DBPing(conf)
 		if err != nil {
-			sugar.Fatalw(err.Error(), "PingDB", "Pinging DB")
+			sugar.Errorw(err.Error(), "PingDB", "Pinging DB")
 			return err, pingOK
 		}
 
@@ -67,7 +67,7 @@ func PingDB(conf *config.Cfg) (error, bool) {
 func StorePair(conf *config.Cfg, shortID, fullURL string) error {
 	sugar, err := logger.InitLogger()
 	if err != nil {
-		sugar.Fatalw(err.Error(), "StorePair", "Start logger")
+		sugar.Errorw(err.Error(), "StorePair", "Start logger")
 		return err
 	}
 
@@ -77,14 +77,14 @@ func StorePair(conf *config.Cfg, shortID, fullURL string) error {
 	case "postgres":
 		err = database.AddOne(conf, shortID, fullURL)
 		if err != nil {
-			sugar.Fatalw(err.Error(), "StorePair", "AddOne to DB")
+			sugar.Errorw(err.Error(), "StorePair", "AddOne to DB")
 			return err
 		}
 		sugar.Info("StorePair", "AddOne to DB OK")
 	case "savefile":
 		err := savefile.SaveFile(conf)
 		if err != nil {
-			sugar.Fatalw(err.Error(), "StorePair", "Save savefile")
+			sugar.Errorw(err.Error(), "StorePair", "Save savefile")
 			return err
 		}
 		sugar.Info("StorePair", "Save savefile OK")
@@ -100,7 +100,7 @@ func StorePair(conf *config.Cfg, shortID, fullURL string) error {
 func CheckPair(conf *config.Cfg, queryID string) (string, error) {
 	sugar, err := logger.InitLogger()
 	if err != nil {
-		sugar.Fatalw(err.Error(), "CheckOne", "Start logger")
+		sugar.Errorw(err.Error(), "CheckOne", "Start logger")
 		return "", err
 	}
 
@@ -111,7 +111,7 @@ func CheckPair(conf *config.Cfg, queryID string) (string, error) {
 	// case "postgres":
 	// 	fullURL, err = database.CheckOne(conf, queryID)
 	// 	if err != nil {
-	// 		sugar.Fatalw(err.Error(), "CheckOne", "Check DB")
+	// 		sugar.Errorw(err.Error(), "CheckOne", "Check DB")
 	// 		return "", err
 	// 	}
 	// 	sugar.Info("CheckOne", "DB check OK")
@@ -124,35 +124,3 @@ func CheckPair(conf *config.Cfg, queryID string) (string, error) {
 
 	return fullURL, nil
 }
-
-// func MemSaveAll(conf *config.Cfg, ) error {
-// 	sugar, err := logger.InitLogger()
-// 	if err != nil {
-// 		sugar.Fatalw(err.Error(), "MemInit", "Start logger")
-// 		return err
-// 	}
-
-// 	switch conf.MemMode {
-// 	case "postgres":
-// 		err = database.Init(conf)
-// 		if err != nil {
-// 			sugar.Fatalw(err.Error(), "MemInit", "Init DB")
-// 			return err
-// 		}
-
-// 		err = database
-
-// 		sugar.Info("MemInit", "Init DB OK")
-// 	case "savefile":
-// 		err := savefile.LoadFile(conf)
-// 		if err != nil {
-// 			sugar.Fatalw(err.Error(), "MemInit", "Load savefile")
-// 			return err
-// 		}
-// 		sugar.Info("MemInit", "Load savefile OK")
-// 	case "memstore":
-// 		sugar.Info("MemInit", "Memstore OK")
-// 	}
-
-// 	return nil
-// }
