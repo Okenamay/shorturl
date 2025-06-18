@@ -23,6 +23,8 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 			sugar.Info("PingHandler. DB ping success")
 		}
 		if !pingOK {
+			sugar.Infof("Database DSN: %s.\nMemMode: %s.",
+				conf.PostgreDSN, conf.MemMode)
 			sugar.Errorw("PingHandler. DB ping failed", "error", err)
 			http.Error(w, "Database not enabled", http.StatusInternalServerError)
 			return
