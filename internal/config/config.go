@@ -53,13 +53,13 @@ func parseFlags() {
 	// не задали значение, то никуда не будем писать:
 	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
-	sugar.Infof("FlagFilePath = %s", &config.SaveFilePath)
 	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
 	// не задали значение, то DSN будет пустой:
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
-	sugar.Infof("FlagDSN = %s", &config.PostgreDSN)
 	flag.Parse()
+
+	var saveFilePath, postgreDSN string
 
 	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
 		config.ServerPort = servPort
@@ -90,6 +90,12 @@ func parseFlags() {
 	} else {
 		config.MemMode = "memstore"
 	}
+
+	sugar.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. ",
+		"useDSN: %v. useFile: %v. saveFilePath: %s. ",
+		"postgreDSN: %v.",
+		config.SaveFilePath, config.PostgreDSN, useDSN, useFile,
+		saveFilePath, postgreDSN)
 }
 
 func InitConfig() *Cfg {
