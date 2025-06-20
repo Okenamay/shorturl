@@ -9,6 +9,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
+	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/go-chi/chi/v5"
 )
@@ -41,7 +42,11 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusCreated)
+		if database.EntryExists {
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			w.WriteHeader(http.StatusCreated)
+		}
 		io.WriteString(w, newURL)
 	}
 }
