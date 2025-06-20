@@ -50,15 +50,17 @@ func BatchHandler(conf *config.Cfg) http.HandlerFunc {
 			sugar.Infof("В батче запись номер: %d содержит: %s", v, temp)
 		}
 
-		// // 3. Convert the request data into the format expected by ProcessBatch.
-		// // This decouples our API contract from our internal processing logic.
-		// rBatchStore := make([]EntryToProcess, len(requestBatch))
-		// for i, entry := range requestBatch {
-		// 	rBatchStore[i] = EntryToProcess{
-		// 		CorrelationID: entry.CorrelationID,
-		// 		OriginalURL:   entry.OriginalURL,
-		// 	}
-		// }
+		// 3. Convert the request data into the format expected by ProcessBatch.
+		// This decouples our API contract from our internal processing logic.
+		rBatchStore := make([]EntryToProcess, len(requestBatch))
+		for i, entry := range requestBatch {
+			rBatchStore[i] = EntryToProcess{
+				CorrelationID: entry.CorrelationID,
+				OriginalURL:   entry.OriginalURL,
+			}
+		}
+
+		sugar.Infof("%+v\n", rBatchStore)
 
 		// // 4. Call the provided processing function
 		// log.Printf("Processing batch of %d entries...", len(rBatchStore))
