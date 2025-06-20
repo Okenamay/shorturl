@@ -95,6 +95,8 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 	sugar, _ := logger.InitLogger()
 	sugar.Info("AddOne. Start")
 
+	EntryExists = false
+
 	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
 	if err != nil {
 		sugar.Errorw("AddOne. DB pool error", "error", err)
