@@ -45,6 +45,10 @@ func BatchHandler(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		sugar.Info(requestBatch)
+		for v := range requestBatch {
+			temp := requestBatch[v]
+			sugar.Infof("В батче запись номер: %d содержит: %s", v, temp)
+		}
 
 		// // 3. Convert the request data into the format expected by ProcessBatch.
 		// // This decouples our API contract from our internal processing logic.
