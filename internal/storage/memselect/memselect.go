@@ -132,9 +132,13 @@ func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntr
 
 	for v := range requestBatch {
 		tempCorrelationID := requestBatch[v].CorrelationID
+		sugar.Infof("BatchHandler. tempCorrelationID run %v: %s", v, tempCorrelationID)
 		tempOriginalURL := requestBatch[v].OriginalURL
+		sugar.Infof("BatchHandler. tempOriginalURL run %v: %s", v, tempOriginalURL)
 
 		tempShortURL, tempShortID := urlmaker.ProcessURL(conf, tempOriginalURL)
+		sugar.Infof("BatchHandler. tempShortURL run %v: %s", v, tempShortURL)
+		sugar.Infof("BatchHandler. tempShortID run %v: %s", v, tempShortID)
 
 		responseBatch = append(responseBatch, ResponseEntry{
 			CorrelationID: tempCorrelationID,
