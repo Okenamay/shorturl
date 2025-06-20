@@ -25,17 +25,9 @@ func BatchHandler(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		// Debug data:
-		sugar.Info(requestBatch)
-		for v := range requestBatch {
-			temp := requestBatch[v]
-			sugar.Infof("В батче запись номер: %d содержит: %s", v, temp)
-		}
-
 		sugar.Infof("Processing batch of %d entries...", len(requestBatch))
 		responseBatch, err := memselect.ProcessBatch(conf, requestBatch)
 		if err != nil {
-			// If the processing fails, return an internal server error.
 			sugar.Infof("Error processing batch: %v", err)
 			http.Error(w, "Failed to process batch", http.StatusInternalServerError)
 			return
