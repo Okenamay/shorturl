@@ -89,6 +89,8 @@ func DBPing(conf *config.Cfg) error {
 	return nil
 }
 
+var EntryExists bool
+
 func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 	sugar, _ := logger.InitLogger()
 	sugar.Info("AddOne. Start")
@@ -109,6 +111,7 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 	}
 	if exists {
 		sugar.Infof("AddOne. DB entry '%s' already exists", fullURL)
+		EntryExists = true
 		return nil
 	}
 
