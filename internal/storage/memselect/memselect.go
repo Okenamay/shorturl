@@ -3,13 +3,29 @@ package memselect
 import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
-func MemInit(conf *config.Cfg) error {
+type DB interface {
+	Ping() error
+	AddOne(shortID, fullURL string) error
+}
+
+type MemStorage interface {
+	StoreURLIDPair(shortID, fullURL string)
+}
+
+type Memselect struct {
+	db         DB
+	memstorage MemStorage
+}
+
+func MemInit(conf *config.Cfg, pool *pgxpool.Pool) (*Memselect, error) {
 	sugar, err := logger.InitLogger()
 	if err != nil {
 		sugar.Errorw(err.Error(), "MemInit", "Start logger")
@@ -18,7 +34,7 @@ func MemInit(conf *config.Cfg) error {
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.StartDB(conf)
+		db, err := database.StartDB(conf, pool, true)
 		if err != nil {
 			sugar.Errorw(err.Error(), "MemInit", "Init DB")
 			return err
@@ -37,7 +53,12 @@ func MemInit(conf *config.Cfg) error {
 		sugar.Info("MemInit", "Wrong MemMode")
 	}
 
-	return nil
+	memselect := Memselect{
+		db:         db,
+		memstorage: memstorage,
+	}
+
+	return &memselect, nil
 }
 
 var pingOK bool

@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"os"
+	"sync"
 
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
@@ -27,19 +28,16 @@ type Cfg struct {
 	MemMode           string
 }
 
-var config *Cfg
 var useFile bool
 var useDSN bool
 
-func parseFlags() {
+func parseFlags() *Cfg {
 	sugar, err := logger.InitLogger()
 	if err != nil {
 		sugar.Errorw(err.Error(), "Main", "Start logger")
 	}
 
-	if config == nil {
-		config = &Cfg{}
-	}
+	config := &Cfg{}
 
 	flag.IntVar(&config.ShortIDLen, "l", ShortIDLen,
 		"Длина короткого ID – целое число от 8 до 32")
@@ -97,10 +95,14 @@ func parseFlags() {
 }
 
 func InitConfig() *Cfg {
-	if config != nil {
-		return config
-	}
+	var (
+		once   sync.Once
+		config *Cfg
+	)
 
-	parseFlags()
+	once.Do(func() {
+		config = parseFlags()
+	})
+
 	return config
 }
