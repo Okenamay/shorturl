@@ -16,7 +16,10 @@ var (
 
 // Создадим таблицу в базе данных:
 func StartDB(conf *config.Cfg) error {
-	sugar, _ := logger.InitLogger()
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "StartDB", "Start logger")
+	}
 	sugar.Info("StartDB. Start")
 
 	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
@@ -70,7 +73,10 @@ func StartDB(conf *config.Cfg) error {
 }
 
 func DBPing(conf *config.Cfg) error {
-	sugar, _ := logger.InitLogger()
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "DBPing", "Start logger")
+	}
 	sugar.Info("DBPing. Start")
 
 	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
@@ -92,7 +98,10 @@ func DBPing(conf *config.Cfg) error {
 var EntryExists bool
 
 func AddOne(conf *config.Cfg, shortID, fullURL string) error {
-	sugar, _ := logger.InitLogger()
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "AddOne", "Start logger")
+	}
 	sugar.Info("AddOne. Start")
 
 	EntryExists = false

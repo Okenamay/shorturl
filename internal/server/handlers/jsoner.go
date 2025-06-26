@@ -25,13 +25,16 @@ type JSONResponse struct {
 // Обработка запроса на переход по JSON-запросу:
 func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		sugar, err := logger.InitLogger()
+		if err != nil {
+			sugar.Errorw(err.Error(), "JSONHandler", "Start logger")
+		}
 		sugar.Info("JSONHandler. Start")
 
 		var request JSONRequest
 		var buf bytes.Buffer
 
-		_, err := buf.ReadFrom(r.Body)
+		_, err = buf.ReadFrom(r.Body)
 		if err != nil {
 			sugar.Error("JSONHandler. Body error")
 			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)

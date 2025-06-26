@@ -7,7 +7,6 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
-// Main:
 func main() {
 	conf := config.InitConfig()
 

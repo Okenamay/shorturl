@@ -11,7 +11,10 @@ import (
 // PingHandler проверяет соединение с базой данных и отвечает на пинг:
 func PingHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		sugar, err := logger.InitLogger()
+		if err != nil {
+			sugar.Errorw(err.Error(), "PingHandler", "Start logger")
+		}
 		sugar.Info("PingHandler. Start")
 
 		err, pingOK := memselect.PingDB(conf)

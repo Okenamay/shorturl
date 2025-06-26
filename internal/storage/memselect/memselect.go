@@ -125,7 +125,11 @@ type ResponseEntry struct {
 }
 
 func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
-	sugar, _ := logger.InitLogger()
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "ProcessBatch", "Start logger")
+	}
+
 	sugar.Info("BatchHandler. Start")
 
 	var responseBatch []ResponseEntry

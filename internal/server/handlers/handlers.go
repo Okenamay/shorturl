@@ -54,7 +54,10 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 // Обработка запроса на переход по полному URL:
 func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		sugar, err := logger.InitLogger()
+		if err != nil {
+			sugar.Errorw(err.Error(), "RedirectHandler", "Start logger")
+		}
 		sugar.Info("RedirectHandler. Start")
 
 		queryID := chi.URLParam(r, "id")

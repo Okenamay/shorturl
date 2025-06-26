@@ -22,7 +22,11 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 
 func Compressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		sugar, err := logger.InitLogger()
+		if err != nil {
+			sugar.Errorw(err.Error(), "Compressor", "Start logger")
+		}
+		sugar.Info("Compressor. Start")
 
 		acceptEncoding := r.Header.Values("Accept-Encoding")
 		var isGzip bool
@@ -74,7 +78,11 @@ func Compressor(next http.Handler) http.Handler {
 
 func Decompressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		sugar, err := logger.InitLogger()
+		if err != nil {
+			sugar.Errorw(err.Error(), "Decompressor", "Start logger")
+		}
+		sugar.Info("Decompressor. Start")
 
 		contentEncoding := r.Header.Values("Content-Encoding")
 		isGzip := slices.Contains(contentEncoding, "gzip")

@@ -14,11 +14,14 @@ type ResponseEntry = memselect.ResponseEntry
 
 func BatchHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		sugar, err := logger.InitLogger()
+		if err != nil {
+			sugar.Errorw(err.Error(), "BatchHandler", "Start logger")
+		}
 		sugar.Info("BatchHandler. Start")
 
 		var requestBatch []RequestEntry
-		err := json.NewDecoder(r.Body).Decode(&requestBatch)
+		err = json.NewDecoder(r.Body).Decode(&requestBatch)
 		if err != nil {
 			sugar.Error("BatchHandler. Invalid request body format")
 			http.Error(w, "Invalid request body format", http.StatusBadRequest)
