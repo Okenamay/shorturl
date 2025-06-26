@@ -18,9 +18,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestShortenHandler(t *testing.T) {
-	conf := config.InitConfig()
+var Conf *config.Cfg
 
+func TestInit(t *testing.T) {
+	Conf = config.InitConfig()
+}
+
+func TestShortenHandler(t *testing.T) {
 	type want struct {
 		code        int
 		response    string
@@ -93,7 +97,7 @@ func TestShortenHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", ShortenHandler(conf))
+	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", ShortenHandler(Conf))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -123,11 +127,9 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
-	conf := config.InitConfig()
-
 	memstorage.URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
-	_, shortID := urlmaker.ProcessURL(conf, originalURL)
+	_, shortID := urlmaker.ProcessURL(Conf, originalURL)
 	memstorage.URLStore[shortID] = originalURL
 
 	type want struct {
@@ -173,7 +175,7 @@ func TestRedirectHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", RedirectHandler(conf))
+	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", RedirectHandler(Conf))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
