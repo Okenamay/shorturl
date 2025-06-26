@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
-	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -17,11 +16,9 @@ import (
 )
 
 func TestJSONHandler(t *testing.T) {
-	conf := config.InitConfig()
-
 	memstorage.URLStore = make(map[string]string)
 	originalURL := "https://topdeck.ru/"
-	result, shortID := urlmaker.ProcessURL(conf, originalURL)
+	result, shortID := urlmaker.ProcessURL(Conf, originalURL)
 	memstorage.URLStore[shortID] = originalURL
 
 	type want struct {
@@ -69,7 +66,7 @@ func TestJSONHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.Post("/api/shorten", JSONHandler(conf))
+	router.Post("/api/shorten", JSONHandler(Conf))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
