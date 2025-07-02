@@ -16,7 +16,7 @@ const (
 	ShortIDAddr = "http://localhost:8080"                        // Адрес и порт для коротких ID
 	SaveFile    = "/tmp/short-url-db.json"                       // Имя файла-хранилища
 	PostgreDSN  = "postgresql://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
-	Verbose     = true                                           // Флаг детальности логов. !!! Временная заглушка
+	Verbose     = false                                          // Флаг детальности логов. !!! Временная заглушка
 	MigrID      = "20250520160000"                               // Дефолтная миграция, заглушка
 	MigrDir     = "up"                                           // Дефолтный роллбек, заглушка
 	DBReinit    = true                                           // Флаг переинициализации БД при старте
@@ -91,6 +91,36 @@ func parseFlags() *Cfg {
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
 		sugar.Infof("EnvDSN = %s", postgreDSN)
+	}
+
+	if logVerbose, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
+		switch logVerbose {
+		case "true":
+			config.LogVerbose = true
+		default:
+			config.LogVerbose = false
+		}
+		sugar.Infof("EnvVerbose = %s", logVerbose)
+	}
+
+	if migrateID, ok := os.LookupEnv("MIGRATION_ID"); ok && migrateID != "" {
+		config.MigrateID = migrateID
+		sugar.Infof("EnvMigrID = %s", migrateID)
+	}
+
+	if migrateDirection, ok := os.LookupEnv("MIGRATION_DIRECTION"); ok && migrateDirection != "" {
+		config.MigrateDirection = migrateDirection
+		sugar.Infof("EnvMigrDir = %s", migrateDirection)
+	}
+
+	if dbReinitialize, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
+		switch dbReinitialize {
+		case "true":
+			config.DBReinitialize = true
+		default:
+			config.DBReinitialize = false
+		}
+		sugar.Infof("EnvVerbose = %s", dbReinitialize)
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,

@@ -33,6 +33,10 @@ func TestParseFlags(t *testing.T) {
 				SaveFilePath:      "",
 				PostgreDSN:        "",
 				MemMode:           "memstore",
+				LogVerbose:        Verbose,
+				MigrateID:         MigrID,
+				MigrateDirection:  MigrDir,
+				DBReinitialize:    DBReinit,
 			},
 		},
 		{
@@ -51,6 +55,10 @@ func TestParseFlags(t *testing.T) {
 				SaveFilePath:      "/tmp/flag-db.json",
 				PostgreDSN:        "",
 				MemMode:           "savefile",
+				LogVerbose:        Verbose,
+				MigrateID:         MigrID,
+				MigrateDirection:  MigrDir,
+				DBReinitialize:    DBReinit,
 			},
 		},
 		{
@@ -69,6 +77,10 @@ func TestParseFlags(t *testing.T) {
 				SaveFilePath:      "/tmp/flag-db.json",
 				PostgreDSN:        "postgres://env-user:env-pass@host/env-db",
 				MemMode:           "postgres",
+				LogVerbose:        Verbose,
+				MigrateID:         MigrID,
+				MigrateDirection:  MigrDir,
+				DBReinitialize:    DBReinit,
 			},
 		},
 		{
@@ -87,6 +99,10 @@ func TestParseFlags(t *testing.T) {
 				SaveFilePath:      "",
 				PostgreDSN:        "",
 				MemMode:           "memstore",
+				LogVerbose:        Verbose,
+				MigrateID:         MigrID,
+				MigrateDirection:  MigrDir,
+				DBReinitialize:    DBReinit,
 			},
 		},
 	}
