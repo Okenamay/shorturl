@@ -10,12 +10,16 @@ import (
 
 // Дефолтные значения до применения флагов:
 const (
-	ShortIDLen        = 10                                             // Длина короткого идентификатора
-	IdleTimeout       = 600                                            // Таймаут сервера в секундах
-	ServerPort        = ":8080"                                        // Адрес и порт сервера
-	ShortIDServerPort = "http://localhost:8080"                        // Адрес и порт для коротких ID
-	SaveFile          = "/tmp/short-url-db.json"                       // Имя файла-хранилища
-	PostgreDSN        = "postgresql://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
+	ShortIDLen  = 10                                             // Длина короткого идентификатора
+	IdleTimeout = 600                                            // Таймаут сервера в секундах
+	ServerPort  = ":8080"                                        // Адрес и порт сервера
+	ShortIDAddr = "http://localhost:8080"                        // Адрес и порт для коротких ID
+	SaveFile    = "/tmp/short-url-db.json"                       // Имя файла-хранилища
+	PostgreDSN  = "postgresql://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
+	Verbose     = true                                           // Флаг детальности логов. !!! Временная заглушка
+	MigrID      = "20250520160000"                               // Дефолтная миграция, заглушка
+	MigrDir     = "up"                                           // Дефолтный роллбек, заглушка
+	DBReinit    = true                                           // Флаг переинициализации БД при старте
 )
 
 type Cfg struct {
@@ -26,6 +30,10 @@ type Cfg struct {
 	SaveFilePath      string
 	PostgreDSN        string
 	MemMode           string
+	LogVerbose        bool
+	MigrateID         string
+	MigrateDirection  string
+	DBReinitialize    bool
 }
 
 var useFile bool
@@ -34,7 +42,7 @@ var useDSN bool
 func parseFlags() *Cfg {
 	sugar, err := logger.InitLogger()
 	if err != nil {
-		sugar.Errorw(err.Error(), "Main", "Start logger")
+		sugar.Errorw(err.Error(), "parseFlags", "Start logger")
 	}
 
 	config := &Cfg{}
@@ -45,7 +53,7 @@ func parseFlags() *Cfg {
 		"Таймаут сервера – целое число, желательно от 10 до 600")
 	flag.StringVar(&config.ServerPort, "a", ServerPort,
 		"Адрес запуска сервера в формате host:port или :port")
-	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDServerPort,
+	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDAddr,
 		"Адрес коротких ID в формате host:port/path")
 	// Сделали дефолтным значением SaveFilePath "" – если флагом или переменной среды
 	// не задали значение, то никуда не будем писать:
@@ -55,6 +63,14 @@ func parseFlags() *Cfg {
 	// не задали значение, то DSN будет пустой:
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
+	flag.BoolVar(&config.LogVerbose, "log", Verbose,
+		"Вывод подробного лога (bool)")
+	flag.StringVar(&config.MigrateID, "migid", MigrID,
+		"ID миграции БД в формате YYYYMMDDHHMMSS")
+	flag.StringVar(&config.MigrateDirection, "migdir", MigrDir,
+		"Направление миграции БД (up = миграция, down = роллбек)")
+	flag.BoolVar(&config.DBReinitialize, "dbx", DBReinit,
+		"Реинициализация БД (bool)")
 	flag.Parse()
 
 	var saveFilePath, postgreDSN string
@@ -108,3 +124,14 @@ func InitConfig() *Cfg {
 
 	return config
 }
+
+// Добавляем два флага:
+// 1) Migrate, -m, bool;
+// 2) DB Rebuild, -x, bool.
+// По флагу x мы запускаем участок кода database, который делает
+// CREATE TABLE IF NOT EXISTS urls (...
+// По флагу m мы запускаем новую функцию, которая делает migrate
+// Меняем логику работы с памятью. Если conf.MemMode не postgresql,
+// код DB мы вообще не вызываем. Может, вообще делаем структуру
+// Storage, в которой будет conf.MemMode, conf.PostgreDSN,
+// conf.SaveFilePath... Подумаю.
