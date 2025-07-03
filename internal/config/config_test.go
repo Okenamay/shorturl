@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,6 +15,11 @@ func TestParseFlags(t *testing.T) {
 		os.Args = originalArgs
 		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	}()
+
+	if err := logger.InitLogger(); err != nil {
+		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
+	}
+	defer logger.Zap.Sync()
 
 	testCases := []struct {
 		name    string

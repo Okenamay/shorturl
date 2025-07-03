@@ -11,6 +11,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
 	"github.com/go-chi/chi/v5"
@@ -21,6 +22,11 @@ import (
 var Conf *config.Cfg
 
 func TestInit(t *testing.T) {
+	if err := logger.InitLogger(); err != nil {
+		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
+	}
+	defer logger.Zap.Sync()
+
 	Conf = config.InitConfig()
 }
 
