@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	DBPool *pgxpool.Pool
+	DBPool      *pgxpool.Pool
+	EntryExists bool
 )
 
-// Создадим таблицу в базе данных:
 func StartDB(conf *config.Cfg) error {
 	sugar, err := logger.InitLogger()
 	if err != nil {
@@ -22,12 +22,50 @@ func StartDB(conf *config.Cfg) error {
 	}
 	sugar.Info("StartDB. Start")
 
-	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
+	DBPool, err = pgxpool.New(context.Background(), conf.PostgreDSN)
 	if err != nil {
-		sugar.Errorw("Init. Failed to connect pgxpool", "error", err)
+		sugar.Errorw("StartDB. Failed to connect pgxpool", "error", err)
 		return err
 	}
-	defer dbPool.Close()
+
+	if conf.DBReinitialize {
+		if err := DBReinit(conf); err != nil {
+			return err
+		}
+	}
+
+	rows, err := DBPool.Query(context.Background(), "SELECT url, short_id FROM urls")
+	if err != nil {
+		sugar.Errorw("StartDB. Failed to read table", "error", err)
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fullURL, shortID string
+		if err := rows.Scan(&fullURL, &shortID); err != nil {
+			sugar.Errorw("StartDB. Failed to scan row", "error", err)
+			return err
+		}
+		memstorage.StoreURLIDPair(shortID, fullURL)
+	}
+
+	if err := rows.Err(); err != nil {
+		sugar.Errorf("StartDB. Failed to iterate rows: %w", err)
+		return err
+	}
+
+	sugar.Infof("StartDB. Loaded %d records into memory", len(memstorage.URLStore))
+
+	return nil
+}
+
+func DBReinit(conf *config.Cfg) error {
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "DBReinit", "Start logger")
+	}
+	sugar.Info("DBReinit. Start")
 
 	sql := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS urls (
@@ -38,55 +76,45 @@ func StartDB(conf *config.Cfg) error {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
     `, conf.ShortIDLen)
 
-	_, err = dbPool.Exec(context.Background(), sql)
-	if err != nil {
-		sugar.Errorw("Init. Failed to create table", "error", err)
-		return fmt.Errorf("ошибка при создании таблицы: %w", err)
+	if DBPool == nil {
+		sugar.Error("DBPing. DB pool not initialized")
+		return nil
 	}
 
-	sugar.Info("StartDB. Table created or already exists")
-
-	rows, err := dbPool.Query(context.Background(), "SELECT url, short_id FROM urls")
+	_, err = DBPool.Exec(context.Background(), sql)
 	if err != nil {
-		sugar.Errorw("Init. Failed to read table", "error", err)
+		sugar.Errorf("DBReinit. Failed to create table: %w", err)
 		return err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var fullURL, shortID string
-		if err := rows.Scan(&fullURL, &shortID); err != nil {
-			sugar.Errorw("Init. Failed to scan row", "error", err)
-			return err
-		}
-		memstorage.StoreURLIDPair(shortID, fullURL)
-	}
-
-	if err := rows.Err(); err != nil {
-		sugar.Errorw("Init. Failed to iterate rows", "error", err)
-		return fmt.Errorf("ошибка при обработке строк: %w", err)
-	}
-
-	sugar.Infof("StartDB. Loaded %d records into memory", len(memstorage.URLStore))
-
+	sugar.Info("DBReinit. Table created or already exists")
 	return nil
 }
 
-func DBPing(conf *config.Cfg) error {
+func StopDB() {
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "StopDB", "Start logger")
+	}
+	if DBPool != nil {
+		DBPool.Close()
+		sugar.Info("StopDB. Database connection pool closed.")
+	}
+}
+
+func DBPing() error {
 	sugar, err := logger.InitLogger()
 	if err != nil {
 		sugar.Errorw(err.Error(), "DBPing", "Start logger")
 	}
 	sugar.Info("DBPing. Start")
 
-	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
-	if err != nil {
-		sugar.Errorw("DBPing. DB pool error", "error", err)
-		return err
+	if DBPool == nil {
+		sugar.Error("DBPing. DB pool not initialized")
+		return nil
 	}
-	defer dbPool.Close()
 
-	err = dbPool.Ping(context.Background())
+	err = DBPool.Ping(context.Background())
 	if err != nil {
 		sugar.Errorw("DBPing. DB ping error", "error", err)
 		return err
@@ -94,8 +122,6 @@ func DBPing(conf *config.Cfg) error {
 
 	return nil
 }
-
-var EntryExists bool
 
 func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 	sugar, err := logger.InitLogger()
@@ -106,15 +132,13 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 
 	EntryExists = false
 
-	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
-	if err != nil {
-		sugar.Errorw("AddOne. DB pool error", "error", err)
-		return err
+	if DBPool == nil {
+		sugar.Error("AddOne. DB pool is not initialized")
+		return nil
 	}
-	defer dbPool.Close()
 
 	var exists bool
-	err = dbPool.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).
+	err = DBPool.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).
 		Scan(&exists)
 	if err != nil {
 		sugar.Errorw("AddOne. DB entry check error", "error", err)
@@ -126,11 +150,10 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 		return nil
 	}
 
-	_, err = dbPool.Exec(context.Background(),
+	_, err = DBPool.Exec(context.Background(),
 		"INSERT INTO urls (url, short_id) VALUES ($1, $2)",
 		fullURL, shortID)
 	if err != nil {
-		sugar.Errorw("AddOne. Error adding DB entry", "error", err)
 		sugar.Infof("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
 		return err
 	}

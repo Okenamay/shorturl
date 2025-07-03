@@ -40,6 +40,20 @@ func MemInit(conf *config.Cfg) error {
 	return nil
 }
 
+func MemStop(conf *config.Cfg) {
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "MemStop", "Start logger")
+	}
+	switch conf.MemMode {
+	case "postgres":
+		database.StopDB()
+		sugar.Info("MemStop", "Stop DB OK")
+	default:
+		sugar.Info("MemStop", "Nothing to stop for this MemMode")
+	}
+}
+
 var pingOK bool
 
 func PingDB(conf *config.Cfg) (error, bool) {
@@ -51,7 +65,7 @@ func PingDB(conf *config.Cfg) (error, bool) {
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.DBPing(conf)
+		err = database.DBPing()
 		if err != nil {
 			sugar.Errorw(err.Error(), "PingDB", "Pinging DB")
 			return err, pingOK
@@ -104,10 +118,6 @@ func CheckPair(conf *config.Cfg, queryID string) (string, error) {
 		sugar.Errorw(err.Error(), "CheckOne", "Start logger")
 		return "", err
 	}
-
-	// В теории, мы хотим читать из нужного источника, но зачем,
-	// если всё равно при инициализации всё в мапу считали?
-	// Или таки обязательно?
 
 	fullURL := memstorage.URLStore[queryID]
 

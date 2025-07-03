@@ -19,6 +19,7 @@ func main() {
 	if err != nil {
 		sugar.Errorw(err.Error(), "Main", "Initialize storage")
 	}
+	defer memselect.MemStop(conf)
 
 	sugar.Infow("Starting server on port: ", conf.ServerPort)
 
