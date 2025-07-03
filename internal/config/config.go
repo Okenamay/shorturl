@@ -40,11 +40,6 @@ var useFile bool
 var useDSN bool
 
 func parseFlags() *Cfg {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "parseFlags", "Start logger")
-	}
-
 	config := &Cfg{}
 
 	flag.IntVar(&config.ShortIDLen, "l", ShortIDLen,
@@ -85,12 +80,12 @@ func parseFlags() *Cfg {
 
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
-		sugar.Infof("EnvFilePath = %s", saveFilePath)
+		logger.Zap.Infof("EnvFilePath = %s", saveFilePath)
 	}
 
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
-		sugar.Infof("EnvDSN = %s", postgreDSN)
+		logger.Zap.Infof("EnvDSN = %s", postgreDSN)
 	}
 
 	if logVerbose, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
@@ -100,17 +95,17 @@ func parseFlags() *Cfg {
 		default:
 			config.LogVerbose = false
 		}
-		sugar.Infof("EnvVerbose = %s", logVerbose)
+		logger.Zap.Infof("EnvVerbose = %s", logVerbose)
 	}
 
 	if migrateID, ok := os.LookupEnv("MIGRATION_ID"); ok && migrateID != "" {
 		config.MigrateID = migrateID
-		sugar.Infof("EnvMigrID = %s", migrateID)
+		logger.Zap.Infof("EnvMigrID = %s", migrateID)
 	}
 
 	if migrateDirection, ok := os.LookupEnv("MIGRATION_DIRECTION"); ok && migrateDirection != "" {
 		config.MigrateDirection = migrateDirection
-		sugar.Infof("EnvMigrDir = %s", migrateDirection)
+		logger.Zap.Infof("EnvMigrDir = %s", migrateDirection)
 	}
 
 	if dbReinitialize, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
@@ -120,7 +115,7 @@ func parseFlags() *Cfg {
 		default:
 			config.DBReinitialize = false
 		}
-		sugar.Infof("EnvVerbose = %s", dbReinitialize)
+		logger.Zap.Infof("EnvVerbose = %s", dbReinitialize)
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
@@ -133,7 +128,7 @@ func parseFlags() *Cfg {
 		config.MemMode = "memstore"
 	}
 
-	sugar.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
+	logger.Zap.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
 		"useDSN: %t. useFile: %t. saveFilePath: %s. "+
 		"postgreDSN: %s.",
 		config.SaveFilePath, config.PostgreDSN, useDSN, useFile,

@@ -14,28 +14,24 @@ type ResponseEntry = memselect.ResponseEntry
 
 func BatchHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, err := logger.InitLogger()
-		if err != nil {
-			sugar.Errorw(err.Error(), "BatchHandler", "Start logger")
-		}
-		sugar.Info("BatchHandler. Start")
+		logger.Zap.Info("BatchHandler. Start")
 
 		var requestBatch []RequestEntry
-		err = json.NewDecoder(r.Body).Decode(&requestBatch)
+		err := json.NewDecoder(r.Body).Decode(&requestBatch)
 		if err != nil {
-			sugar.Error("BatchHandler. Invalid request body format")
+			logger.Zap.Error("BatchHandler. Invalid request body format")
 			http.Error(w, "Invalid request body format", http.StatusBadRequest)
 			return
 		}
 
-		sugar.Infof("Processing batch of %d entries...", len(requestBatch))
+		logger.Zap.Infof("Processing batch of %d entries...", len(requestBatch))
 		responseBatch, err := memselect.ProcessBatch(conf, requestBatch)
 		if err != nil {
-			sugar.Infof("Error processing batch: %v", err)
+			logger.Zap.Infof("Error processing batch: %v", err)
 			http.Error(w, "Failed to process batch", http.StatusInternalServerError)
 			return
 		}
-		sugar.Info("Batch processed successfully.")
+		logger.Zap.Info("Batch processed successfully.")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)

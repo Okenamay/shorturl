@@ -11,23 +11,19 @@ import (
 // Run executes the migration logic based on the provided configuration and direction.
 // direction should be "up" to apply or "down" to roll back.
 func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg) error {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "MigrateLauncher", "Start logger")
-	}
-	sugar.Info("MigrateLauncher. Start")
+	logger.Zap.Info("MigrateLauncher. Start")
 
 	if conf.MigrateID == "" {
-		sugar.Info("Migration disabled. Skipping.")
+		logger.Zap.Info("Migration disabled. Skipping.")
 		return nil
 	}
 
-	sugar.Infof("Attempting migration for ID: %s, direction: %s",
+	logger.Zap.Infof("Attempting migration for ID: %s, direction: %s",
 		conf.MigrateID, conf.MigrateDirection)
 
 	migration := DeliverMigration(conf)
 	if migration.ID == "" {
-		sugar.Infof("Unknown migration ID: %s", conf.MigrateID)
+		logger.Zap.Infof("Unknown migration ID: %s", conf.MigrateID)
 		return nil
 	}
 
@@ -35,23 +31,23 @@ func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg
 	case "up":
 		_, err := dbpool.Exec(ctx, migration.UpSQL)
 		if err != nil {
-			sugar.Errorf("Migration ID: %s failed: %v", migration.ID, err)
+			logger.Zap.Errorf("Migration ID: %s failed: %v", migration.ID, err)
 			return err
 		}
 
-		sugar.Infof("Successfully applied migration: %s", migration.ID)
+		logger.Zap.Infof("Successfully applied migration: %s", migration.ID)
 		return nil
 	case "down":
 		_, err := dbpool.Exec(ctx, migration.DownSQL)
 		if err != nil {
-			sugar.Errorf("Rollback ID: %s failed: %v", migration.ID, err)
+			logger.Zap.Errorf("Rollback ID: %s failed: %v", migration.ID, err)
 			return err
 		}
 
-		sugar.Infof("Successfully applied rollback: %s", migration.ID)
+		logger.Zap.Infof("Successfully applied rollback: %s", migration.ID)
 		return nil
 	default:
-		sugar.Infof("Incorrect migration direction: %s", conf.MigrateDirection)
+		logger.Zap.Infof("Incorrect migration direction: %s", conf.MigrateDirection)
 		return nil
 	}
 

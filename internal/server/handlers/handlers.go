@@ -54,11 +54,7 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 // Обработка запроса на переход по полному URL:
 func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, err := logger.InitLogger()
-		if err != nil {
-			sugar.Errorw(err.Error(), "RedirectHandler", "Start logger")
-		}
-		sugar.Info("RedirectHandler. Start")
+		logger.Zap.Info("RedirectHandler. Start")
 
 		queryID := chi.URLParam(r, "id")
 
@@ -69,12 +65,12 @@ func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 
 		fullURL, err := memselect.CheckPair(conf, queryID)
 		if err != nil {
-			sugar.Errorw("RedirectHandler. Failed to check URL/ShortID pair", "error", err)
+			logger.Zap.Errorw("RedirectHandler. Failed to check URL/ShortID pair", "error", err)
 			return
 		}
 
 		if fullURL == "" {
-			sugar.Errorw("RedirectHandler. Failed to find URL/ShortID pair", "error", err)
+			logger.Zap.Errorw("RedirectHandler. Failed to find URL/ShortID pair", "error", err)
 			http.Error(w, emsg.ErrorNotInDB.Error(), http.StatusInternalServerError)
 			return
 		}

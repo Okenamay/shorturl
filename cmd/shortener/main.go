@@ -8,23 +8,23 @@ import (
 )
 
 func main() {
+	if err := logger.InitLogger(); err != nil {
+		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
+	}
+	defer logger.Zap.Sync()
+
 	conf := config.InitConfig()
 
-	sugar, err := logger.InitLogger()
+	err := memselect.MemInit(conf)
 	if err != nil {
-		sugar.Fatalw(err.Error(), "Main", "Start logger")
-	}
-
-	err = memselect.MemInit(conf)
-	if err != nil {
-		sugar.Errorw(err.Error(), "Main", "Initialize storage")
+		logger.Zap.Errorw(err.Error(), "Main", "Initialize storage")
 	}
 	defer memselect.MemStop(conf)
 
-	sugar.Infow("Starting server on port: ", conf.ServerPort)
+	logger.Zap.Infow("Starting server on port: ", conf.ServerPort)
 
 	err = router.Launch(conf)
 	if err != nil {
-		sugar.Fatalw(err.Error(), "Main", "Start server")
+		logger.Zap.Fatalw(err.Error(), "Main", "Start server")
 	}
 }

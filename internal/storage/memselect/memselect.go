@@ -10,64 +10,54 @@ import (
 )
 
 func MemInit(conf *config.Cfg) error {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "MemInit", "Start logger")
-		return err
-	}
+	logger.Zap.Info("MemInit", "Assessing memory mode")
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.StartDB(conf)
+		err := database.StartDB(conf)
 		if err != nil {
-			sugar.Errorw(err.Error(), "MemInit", "Init DB")
+			logger.Zap.Errorw(err.Error(), "MemInit", "Init DB")
 			return err
 		}
-		sugar.Info("MemInit", "Init DB OK")
+		logger.Zap.Info("MemInit", "Init DB OK")
 	case "savefile":
 		err := savefile.LoadFile(conf)
 		if err != nil {
-			sugar.Errorw(err.Error(), "MemInit", "Load savefile")
+			logger.Zap.Errorw(err.Error(), "MemInit", "Load savefile")
 			return err
 		}
-		sugar.Info("MemInit", "Load savefile OK")
+		logger.Zap.Info("MemInit", "Load savefile OK")
 	case "memstore":
-		sugar.Info("MemInit", "Memstore OK")
+		logger.Zap.Info("MemInit", "Memstore OK")
 	default:
-		sugar.Info("MemInit", "Wrong MemMode")
+		logger.Zap.Info("MemInit", "Wrong MemMode")
 	}
 
 	return nil
 }
 
 func MemStop(conf *config.Cfg) {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "MemStop", "Start logger")
-	}
+	logger.Zap.Info("MemStop", "Stopping memory")
+
 	switch conf.MemMode {
 	case "postgres":
 		database.StopDB()
-		sugar.Info("MemStop", "Stop DB OK")
+		logger.Zap.Info("MemStop", "Stop DB OK")
 	default:
-		sugar.Info("MemStop", "Nothing to stop for this MemMode")
+		logger.Zap.Info("MemStop", "Nothing to stop for this MemMode")
 	}
 }
 
 var pingOK bool
 
 func PingDB(conf *config.Cfg) (error, bool) {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "PingDB", "Start logger")
-		return err, pingOK
-	}
+	logger.Zap.Info("PingDB", "Pinging DB")
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.DBPing()
+		err := database.DBPing()
 		if err != nil {
-			sugar.Errorw(err.Error(), "PingDB", "Pinging DB")
+			logger.Zap.Errorw(err.Error(), "PingDB", "Pinging DB")
 			return err, pingOK
 		}
 
@@ -80,45 +70,35 @@ func PingDB(conf *config.Cfg) (error, bool) {
 }
 
 func StorePair(conf *config.Cfg, shortID, fullURL string) error {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "StorePair", "Start logger")
-		return err
-	}
+	logger.Zap.Info("StorePair", "Running")
 
 	memstorage.StoreURLIDPair(shortID, fullURL)
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.AddOne(conf, shortID, fullURL)
+		err := database.AddOne(conf, shortID, fullURL)
 		if err != nil {
-			sugar.Errorw(err.Error(), "StorePair", "AddOne to DB")
+			logger.Zap.Errorw(err.Error(), "StorePair", "AddOne to DB")
 			return err
 		}
-		sugar.Info("StorePair", "AddOne to DB OK")
+		logger.Zap.Info("StorePair", "AddOne to DB OK")
 	case "savefile":
 		err := savefile.SaveFile(conf)
 		if err != nil {
-			sugar.Errorw(err.Error(), "StorePair", "Save savefile")
+			logger.Zap.Errorw(err.Error(), "StorePair", "Save savefile")
 			return err
 		}
-		sugar.Info("StorePair", "Save savefile OK")
+		logger.Zap.Info("StorePair", "Save savefile OK")
 	case "memstore":
-		sugar.Info("StorePair", "Memstore OK")
+		logger.Zap.Info("StorePair", "Memstore OK")
 	default:
-		sugar.Info("StorePair", "Wrong MemMode")
+		logger.Zap.Info("StorePair", "Wrong MemMode")
 	}
 
 	return nil
 }
 
 func CheckPair(conf *config.Cfg, queryID string) (string, error) {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "CheckOne", "Start logger")
-		return "", err
-	}
-
 	fullURL := memstorage.URLStore[queryID]
 
 	return fullURL, nil
@@ -135,24 +115,19 @@ type ResponseEntry struct {
 }
 
 func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "ProcessBatch", "Start logger")
-	}
-
-	sugar.Info("BatchHandler. Start")
+	logger.Zap.Info("BatchHandler. Start")
 
 	var responseBatch []ResponseEntry
 
 	for v := range requestBatch {
 		tempCorrelationID := requestBatch[v].CorrelationID
-		sugar.Infof("BatchHandler. tempCorrelationID run %v: %s", v, tempCorrelationID)
+		logger.Zap.Infof("BatchHandler. tempCorrelationID run %v: %s", v, tempCorrelationID)
 		tempOriginalURL := requestBatch[v].OriginalURL
-		sugar.Infof("BatchHandler. tempOriginalURL run %v: %s", v, tempOriginalURL)
+		logger.Zap.Infof("BatchHandler. tempOriginalURL run %v: %s", v, tempOriginalURL)
 
 		tempShortURL, tempShortID := urlmaker.ProcessURL(conf, tempOriginalURL)
-		sugar.Infof("BatchHandler. tempShortURL run %v: %s", v, tempShortURL)
-		sugar.Infof("BatchHandler. tempShortID run %v: %s", v, tempShortID)
+		logger.Zap.Infof("BatchHandler. tempShortURL run %v: %s", v, tempShortURL)
+		logger.Zap.Infof("BatchHandler. tempShortID run %v: %s", v, tempShortID)
 
 		responseBatch = append(responseBatch, ResponseEntry{
 			CorrelationID: tempCorrelationID,
@@ -161,11 +136,11 @@ func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntr
 
 		err := StorePair(conf, tempShortID, tempOriginalURL)
 		if err != nil {
-			sugar.Errorw(err.Error(), "BatchHandler", "StorePair from batch")
+			logger.Zap.Errorw(err.Error(), "BatchHandler", "StorePair from batch")
 			return nil, err
 		}
 	}
 
-	sugar.Info("BatchHandler. Processed batch")
+	logger.Zap.Info("BatchHandler. Processed batch")
 	return responseBatch, nil
 }

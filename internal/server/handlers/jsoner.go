@@ -25,24 +25,20 @@ type JSONResponse struct {
 // Обработка запроса на переход по JSON-запросу:
 func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, err := logger.InitLogger()
-		if err != nil {
-			sugar.Errorw(err.Error(), "JSONHandler", "Start logger")
-		}
-		sugar.Info("JSONHandler. Start")
+		logger.Zap.Info("JSONHandler. Start")
 
 		var request JSONRequest
 		var buf bytes.Buffer
 
-		_, err = buf.ReadFrom(r.Body)
+		_, err := buf.ReadFrom(r.Body)
 		if err != nil {
-			sugar.Error("JSONHandler. Body error")
+			logger.Zap.Error("JSONHandler. Body error")
 			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if err = json.Unmarshal(buf.Bytes(), &request); err != nil {
-			sugar.Errorw("JSONHandler. Unmarshal error", "Error", err)
+			logger.Zap.Errorw("JSONHandler. Unmarshal error", "Error", err)
 			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -70,7 +66,7 @@ func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 
 		data, err := json.Marshal(response)
 		if err != nil {
-			sugar.Errorw("JSONHandler. Marshal error", "error", err)
+			logger.Zap.Errorw("JSONHandler. Marshal error", "error", err)
 			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -82,6 +78,6 @@ func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 			w.WriteHeader(http.StatusCreated)
 		}
 		w.Write(data)
-		sugar.Info("JSONHandler. Stop")
+		logger.Zap.Info("JSONHandler. Stop")
 	}
 }
