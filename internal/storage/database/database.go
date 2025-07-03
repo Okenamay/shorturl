@@ -24,6 +24,8 @@ func StartDB(conf *config.Cfg) error {
 		return err
 	}
 
+	logger.Zap.Info("StartDB. Pool initialized.")
+
 	if conf.DBReinitialize {
 		if err := DBReinit(conf); err != nil {
 			return err
@@ -69,7 +71,7 @@ func DBReinit(conf *config.Cfg) error {
     `, conf.ShortIDLen)
 
 	if DBPool == nil {
-		logger.Zap.Error("DBPing. DB pool not initialized")
+		logger.Zap.Error("DBReinit. DB pool not initialized")
 		return nil
 	}
 

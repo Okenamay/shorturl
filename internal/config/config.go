@@ -149,14 +149,3 @@ func InitConfig() *Cfg {
 
 	return config
 }
-
-// Добавляем два флага:
-// 1) Migrate, -m, bool;
-// 2) DB Rebuild, -x, bool.
-// По флагу x мы запускаем участок кода database, который делает
-// CREATE TABLE IF NOT EXISTS urls (...
-// По флагу m мы запускаем новую функцию, которая делает migrate
-// Меняем логику работы с памятью. Если conf.MemMode не postgresql,
-// код DB мы вообще не вызываем. Может, вообще делаем структуру
-// Storage, в которой будет conf.MemMode, conf.PostgreDSN,
-// conf.SaveFilePath... Подумаю.
