@@ -24,6 +24,8 @@ func StartDB(conf *config.Cfg) error {
 		return err
 	}
 
+	logger.Zap.Infof("StartDB. DB pool: %v.", DBPool)
+
 	logger.Zap.Info("StartDB. Pool initialized.")
 
 	if conf.DBReinitialize {
