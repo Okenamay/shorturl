@@ -27,7 +27,7 @@ func StartDB(conf *config.Cfg) error {
 	logger.Zap.Info("StartDB. Pool initialized.")
 
 	if conf.DBReinitialize {
-		logger.Zap.Info("StartDB. conf.DBReinitialize: %v.", conf.DBReinitialize)
+		logger.Zap.Infof("StartDB. conf.DBReinitialize: %t.", conf.DBReinitialize)
 		if err := DBReinit(conf); err != nil {
 			return err
 		}
@@ -70,6 +70,8 @@ func DBReinit(conf *config.Cfg) error {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
     `, conf.ShortIDLen)
+
+	logger.Zap.Infof("DBReinit. DB pool: %v.", DBPool)
 
 	if DBPool == nil {
 		logger.Zap.Error("DBReinit. DB pool not initialized")
