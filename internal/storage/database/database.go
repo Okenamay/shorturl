@@ -13,23 +13,21 @@ import (
 var (
 	DBPool      *pgxpool.Pool
 	EntryExists bool
+	err         error
 )
 
 func StartDB(conf *config.Cfg) error {
 	logger.Zap.Info("StartDB. Start")
 
-	DBPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
+	DBPool, err = pgxpool.New(context.Background(), conf.PostgreDSN)
 	if err != nil {
 		logger.Zap.Errorw("StartDB. Failed to connect pgxpool", "error", err)
 		return err
 	}
 
-	logger.Zap.Infof("StartDB. DB pool: %v.", DBPool)
-
 	logger.Zap.Info("StartDB. Pool initialized.")
 
 	if conf.DBReinitialize {
-		logger.Zap.Infof("StartDB. conf.DBReinitialize: %t.", conf.DBReinitialize)
 		if err := DBReinit(conf); err != nil {
 			return err
 		}
@@ -72,8 +70,6 @@ func DBReinit(conf *config.Cfg) error {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
     `, conf.ShortIDLen)
-
-	logger.Zap.Infof("DBReinit. DB pool: %v.", DBPool)
 
 	if DBPool == nil {
 		logger.Zap.Error("DBReinit. DB pool not initialized")
