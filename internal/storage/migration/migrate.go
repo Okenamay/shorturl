@@ -8,8 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Run executes the migration logic based on the provided configuration and direction.
-// direction should be "up" to apply or "down" to roll back.
 func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg) error {
 	logger.Zap.Info("MigrateLauncher. Start")
 

@@ -52,7 +52,6 @@ func BatchHandlerTransaction(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		logger.Zap.Infof("Processing transactional batch of %d entries...", len(requestBatch))
-		// Use the new transactional batch processing function
 		responseBatch, err := memselect.ProcessBatchTransaction(conf, requestBatch)
 		if err != nil {
 			logger.Zap.Errorw("Error processing transactional batch", "error", err)

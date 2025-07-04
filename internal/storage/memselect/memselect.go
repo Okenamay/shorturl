@@ -148,14 +148,12 @@ func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntr
 	return responseBatch, nil
 }
 
-// ProcessBatchTransaction processes a slice of URLs to be shortened using a single transaction.
 func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
 	logger.Zap.Info("ProcessBatchTransaction. Start")
 
 	var responseBatch []ResponseEntry
 	ctx := context.Background()
 
-	// For Postgres, we manage the transaction here
 	var tx pgx.Tx
 	var err error
 	if conf.MemMode == "postgres" {
@@ -164,7 +162,6 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 			logger.Zap.Errorw("ProcessBatchTransaction. Failed to begin transaction", "error", err)
 			return nil, err
 		}
-		// Rollback is deferred to execute if anything goes wrong
 		defer tx.Rollback(ctx)
 	}
 
@@ -176,14 +173,12 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 			ShortURL:      shortURL,
 		})
 
-		// StorePairTransaction will use the transaction if in postgres mode
 		if err := StorePairTransaction(ctx, tx, conf, shortID, entry.OriginalURL); err != nil {
 			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "StorePairTransaction from batch")
-			return nil, err // The deferred rollback will be called
+			return nil, err
 		}
 	}
 
-	// If we are in file mode, save the file now after all in-memory changes are done.
 	if conf.MemMode == "savefile" {
 		if err := savefile.SaveFile(conf); err != nil {
 			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "Save savefile")
@@ -191,7 +186,6 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 		}
 	}
 
-	// If we made it this far with a transaction, commit it.
 	if tx != nil {
 		if err := tx.Commit(ctx); err != nil {
 			logger.Zap.Errorw("ProcessBatchTransaction. Failed to commit transaction", "error", err)
@@ -203,7 +197,6 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 	return responseBatch, nil
 }
 
-// StorePairTransaction saves a pair as part of an existing DB transaction.
 func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shortID, fullURL string) error {
 	memstorage.StoreURLIDPair(shortID, fullURL)
 
@@ -215,8 +208,7 @@ func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shor
 			logger.Zap.Errorw(err.Error(), "StorePairTransaction", "AddOneTransaction to DB")
 			return err
 		}
-	// Non-DB storage modes don't support transactions, so we don't handle them here.
-	// The file will be saved once at the end in ProcessBatchTransaction.
+
 	case "savefile":
 	case "memstore":
 	default:
@@ -225,3 +217,9 @@ func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shor
 
 	return nil
 }
+
+// Перед отправкой хочу сделать следующее
+// 1) mutex
+// 2) "/api/user/urls" и JWT-токены
+// 3) DB через интерфейсы
+// 4) многопоточность

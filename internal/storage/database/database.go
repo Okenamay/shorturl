@@ -147,11 +147,7 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 	return nil
 }
 
-// AddOneTransaction adds a new URL pair to the database as part of an existing transaction.
 func AddOneTransaction(ctx context.Context, tx pgx.Tx, shortID, fullURL string) error {
-	// This function assumes the caller will handle commit/rollback.
-	// We use ON CONFLICT DO NOTHING to handle cases where a URL might already exist,
-	// preventing the entire batch from failing.
 	_, err := tx.Exec(ctx, "INSERT INTO urls (url, short_id) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING", fullURL, shortID)
 	if err != nil {
 		logger.Zap.Errorw("AddOneTransaction. Error adding DB entry", "error", err)
