@@ -1,12 +1,15 @@
 package memselect
 
 import (
+	"context"
+
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
+	pgx "github.com/jackc/pgx/v5"
 )
 
 func MemInit(conf *config.Cfg) error {
@@ -143,4 +146,82 @@ func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntr
 
 	logger.Zap.Info("BatchHandler. Processed batch")
 	return responseBatch, nil
+}
+
+// ProcessBatchTransaction processes a slice of URLs to be shortened using a single transaction.
+func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
+	logger.Zap.Info("ProcessBatchTransaction. Start")
+
+	var responseBatch []ResponseEntry
+	ctx := context.Background()
+
+	// For Postgres, we manage the transaction here
+	var tx pgx.Tx
+	var err error
+	if conf.MemMode == "postgres" {
+		tx, err = database.DBPool.Begin(ctx)
+		if err != nil {
+			logger.Zap.Errorw("ProcessBatchTransaction. Failed to begin transaction", "error", err)
+			return nil, err
+		}
+		// Rollback is deferred to execute if anything goes wrong
+		defer tx.Rollback(ctx)
+	}
+
+	for _, entry := range requestBatch {
+		shortURL, shortID := urlmaker.ProcessURL(conf, entry.OriginalURL)
+
+		responseBatch = append(responseBatch, ResponseEntry{
+			CorrelationID: entry.CorrelationID,
+			ShortURL:      shortURL,
+		})
+
+		// StorePairTransaction will use the transaction if in postgres mode
+		if err := StorePairTransaction(ctx, tx, conf, shortID, entry.OriginalURL); err != nil {
+			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "StorePairTransaction from batch")
+			return nil, err // The deferred rollback will be called
+		}
+	}
+
+	// If we are in file mode, save the file now after all in-memory changes are done.
+	if conf.MemMode == "savefile" {
+		if err := savefile.SaveFile(conf); err != nil {
+			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "Save savefile")
+			return nil, err
+		}
+	}
+
+	// If we made it this far with a transaction, commit it.
+	if tx != nil {
+		if err := tx.Commit(ctx); err != nil {
+			logger.Zap.Errorw("ProcessBatchTransaction. Failed to commit transaction", "error", err)
+			return nil, err
+		}
+	}
+
+	logger.Zap.Info("ProcessBatchTransaction. Batch processed successfully.")
+	return responseBatch, nil
+}
+
+// StorePairTransaction saves a pair as part of an existing DB transaction.
+func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shortID, fullURL string) error {
+	memstorage.StoreURLIDPair(shortID, fullURL)
+
+	var err error
+	switch conf.MemMode {
+	case "postgres":
+		err = database.AddOneTransaction(ctx, tx, shortID, fullURL)
+		if err != nil {
+			logger.Zap.Errorw(err.Error(), "StorePairTransaction", "AddOneTransaction to DB")
+			return err
+		}
+	// Non-DB storage modes don't support transactions, so we don't handle them here.
+	// The file will be saved once at the end in ProcessBatchTransaction.
+	case "savefile":
+	case "memstore":
+	default:
+		logger.Zap.Info("StorePairTransaction", "Wrong MemMode")
+	}
+
+	return nil
 }
