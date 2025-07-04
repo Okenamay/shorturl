@@ -66,8 +66,8 @@ func DBReinit(conf *config.Cfg) error {
 	sql := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS urls (
         id BIGSERIAL PRIMARY KEY,
-        url VARCHAR(1024),
-        short_id VARCHAR(%d)
+        url VARCHAR(1024) UNIQUE,
+        short_id VARCHAR(%d) UNIQUE
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
     `, conf.ShortIDLen)
