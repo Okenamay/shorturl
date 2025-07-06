@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
@@ -18,12 +19,15 @@ type record struct {
 	OriginalURL string `json:"original_url"`
 }
 
+var fileMutex sync.Mutex
+
 // SaveFile записывает всё содержимое memstorage.URLStore в файл
 func SaveFile(conf *config.Cfg) error {
-	dirPath := filepath.Dir(conf.SaveFilePath)
+	fileMutex.Lock()
+	defer fileMutex.Unlock()
 
-	err := os.MkdirAll(dirPath, os.ModePerm)
-	if err != nil {
+	dirPath := filepath.Dir(conf.SaveFilePath)
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -34,7 +38,7 @@ func SaveFile(conf *config.Cfg) error {
 	defer file.Close()
 
 	count := 1
-	for shortID, fullURL := range memstorage.URLStore {
+	for shortID, fullURL := range memstorage.Store.GetAll() {
 		rec := record{
 			UUID:        strconv.Itoa(count),
 			ShortURL:    shortID,
@@ -46,13 +50,12 @@ func SaveFile(conf *config.Cfg) error {
 			return fmt.Errorf("ошибка маршалинга JSON: %w", err)
 		}
 
-		_, err = file.WriteString(string(jsonData) + "\n")
-		if err != nil {
+		if _, err := file.WriteString(string(jsonData) + "\n"); err != nil {
 			return fmt.Errorf("ошибка записи в файл: %w", err)
 		}
-
 		count++
 	}
+
 	return nil
 }
 
@@ -60,6 +63,10 @@ func SaveFile(conf *config.Cfg) error {
 func LoadFile(conf *config.Cfg) error {
 	data, err := os.ReadFile(conf.SaveFilePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
 		return fmt.Errorf("ошибка чтения файла: %w", err)
 	}
 
@@ -71,12 +78,12 @@ func LoadFile(conf *config.Cfg) error {
 		}
 
 		var rec record
-		err := json.Unmarshal(line, &rec)
-		if err != nil {
+		if err := json.Unmarshal(line, &rec); err != nil {
 			return fmt.Errorf("ошибка демаршалинга JSON: %w", err)
 		}
 
-		memstorage.URLStore[rec.ShortURL] = rec.OriginalURL
+		memstorage.Store.Set(rec.ShortURL, rec.OriginalURL)
 	}
+
 	return nil
 }

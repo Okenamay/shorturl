@@ -10,7 +10,6 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
@@ -44,17 +43,15 @@ func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		CheckedURL, checkErr := checker.CheckURL(request.URL)
-
 		if checkErr != nil {
 			http.Error(w, checkErr.Error(), http.StatusBadRequest)
 			return
 		}
 
 		fullURL := CheckedURL.String()
-
 		newURL, shortID := urlmaker.ProcessURL(conf, fullURL)
 
-		err = memselect.StorePair(conf, shortID, fullURL)
+		exists, err := memselect.StorePair(conf, shortID, fullURL)
 		if err != nil {
 			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
 			return
@@ -72,7 +69,7 @@ func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		w.Header().Set("content-type", "application/json")
-		if database.EntryExists {
+		if exists {
 			w.WriteHeader(http.StatusConflict)
 		} else {
 			w.WriteHeader(http.StatusCreated)

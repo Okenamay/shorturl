@@ -47,7 +47,8 @@ func StartDB(conf *config.Cfg) error {
 			logger.Zap.Errorw("StartDB. Failed to scan row", "error", err)
 			return err
 		}
-		memstorage.StoreURLIDPair(shortID, fullURL)
+
+		memstorage.Store.Set(shortID, fullURL)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -55,7 +56,7 @@ func StartDB(conf *config.Cfg) error {
 		return err
 	}
 
-	logger.Zap.Infof("StartDB. Loaded %d records into memory", len(memstorage.URLStore))
+	logger.Zap.Infof("StartDB. Loaded %d records into memory", len(memstorage.Store.GetAll()))
 
 	return nil
 }
@@ -74,7 +75,7 @@ func DBReinit(conf *config.Cfg) error {
 
 	if DBPool == nil {
 		logger.Zap.Error("DBReinit. DB pool not initialized")
-		return nil
+		return fmt.Errorf("DBReinit. DB pool is not initialized")
 	}
 
 	_, err := DBPool.Exec(context.Background(), sql)
@@ -99,7 +100,7 @@ func DBPing() error {
 
 	if DBPool == nil {
 		logger.Zap.Error("DBPing. DB pool not initialized")
-		return nil
+		return fmt.Errorf("DBPing. DB pool not initialized")
 	}
 
 	err := DBPool.Ping(context.Background())
@@ -111,40 +112,37 @@ func DBPing() error {
 	return nil
 }
 
-func AddOne(conf *config.Cfg, shortID, fullURL string) error {
+func AddOne(conf *config.Cfg, shortID, fullURL string) (bool, error) {
 	logger.Zap.Info("AddOne. Start")
-
-	EntryExists = false
 
 	if DBPool == nil {
 		logger.Zap.Error("AddOne. DB pool is not initialized")
-		return nil
+		return false, fmt.Errorf("AddOne. DB pool is not initialized")
 	}
 
 	var exists bool
 	err := DBPool.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).
 		Scan(&exists)
-	if err != nil {
-		logger.Zap.Errorw("AddOne. DB entry check error", "error", err)
-		return err
+	if err == nil {
+		logger.Zap.Infof("AddOne. DB entry '%s' already exists with short_id %s", fullURL, exists)
+		return true, nil
 	}
-	if exists {
-		logger.Zap.Infof("AddOne. DB entry '%s' already exists", fullURL)
-		EntryExists = true
-		return nil
+	if err != pgx.ErrNoRows {
+		logger.Zap.Errorw("AddOne. DB entry check error", "error", err)
+		return false, err
 	}
 
-	_, err = DBPool.Exec(context.Background(),
+	_, errA := DBPool.Exec(context.Background(),
 		"INSERT INTO urls (url, short_id) VALUES ($1, $2)",
 		fullURL, shortID)
-	if err != nil {
+	if errA != nil {
 		logger.Zap.Infof("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
-		return err
+		logger.Zap.Errorw("AddOne. Error adding DB entry", "error", errA)
+		return false, errA
 	}
 
 	logger.Zap.Infof("AddOne. DB entry successful: URL '%s', ShortID '%s'", fullURL, shortID)
-
-	return nil
+	return false, nil
 }
 
 func AddOneTransaction(ctx context.Context, tx pgx.Tx, shortID, fullURL string) error {

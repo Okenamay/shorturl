@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,10 +15,10 @@ import (
 )
 
 func TestJSONHandler(t *testing.T) {
-	memstorage.URLStore = make(map[string]string)
+	memstorage.Store = memstorage.NewURLMap()
 	originalURL := "https://topdeck.ru/"
 	result, shortID := urlmaker.ProcessURL(Conf, originalURL)
-	memstorage.URLStore[shortID] = originalURL
+	memstorage.Store.Set(shortID, originalURL)
 
 	type want struct {
 		code        int
@@ -74,8 +73,7 @@ func TestJSONHandler(t *testing.T) {
 			defer ts.Close()
 
 			body, _ := json.Marshal(tt.request.body)
-			request := httptest.NewRequest(tt.request.method, tt.request.url, nil)
-			request.Body = io.NopCloser(bytes.NewReader(body))
+			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(body))
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, request)
 
@@ -86,11 +84,10 @@ func TestJSONHandler(t *testing.T) {
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
 			if tt.want.code != http.StatusBadRequest && tt.want.code != http.StatusMethodNotAllowed {
-				newURL, err := io.ReadAll(result.Body)
+				var resp JSONResponse
+				err := json.NewDecoder(result.Body).Decode(&resp)
 				require.NoError(t, err)
-				err = result.Body.Close()
-				require.NoError(t, err)
-				assert.NotEmpty(t, newURL)
+				assert.NotEmpty(t, resp.Result)
 			}
 		})
 	}

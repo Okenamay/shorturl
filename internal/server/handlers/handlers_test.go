@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
@@ -21,13 +22,14 @@ import (
 
 var Conf *config.Cfg
 
-func TestInit(t *testing.T) {
+func TestMain(m *testing.M) {
 	if err := logger.InitLogger(); err != nil {
 		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
 	}
-	defer logger.Zap.Sync()
 
 	Conf = config.InitConfig()
+
+	os.Exit(m.Run())
 }
 
 func TestShortenHandler(t *testing.T) {
@@ -133,10 +135,10 @@ func TestShortenHandler(t *testing.T) {
 }
 
 func TestRedirectHandler(t *testing.T) {
-	memstorage.URLStore = make(map[string]string)
+	memstorage.Store = memstorage.NewURLMap()
 	originalURL := "https://topdeck.ru/"
 	_, shortID := urlmaker.ProcessURL(Conf, originalURL)
-	memstorage.URLStore[shortID] = originalURL
+	memstorage.Store.Set(shortID, originalURL)
 
 	type want struct {
 		code        int
@@ -200,12 +202,12 @@ func TestRedirectHandler(t *testing.T) {
 			router.ServeHTTP(w, request)
 
 			result := w.Result()
-			result.Body.Close()
+			defer result.Body.Close()
 
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != result.StatusCode {
+			if result.StatusCode != http.StatusMethodNotAllowed {
 				require.Equal(t, originalURL, result.Header.Get("Location"))
 			}
 		})

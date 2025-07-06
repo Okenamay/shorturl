@@ -15,16 +15,18 @@ import (
 func MemInit(conf *config.Cfg) error {
 	logger.Zap.Info("MemInit", "Assessing memory mode")
 
+	var err error
+
 	switch conf.MemMode {
 	case "postgres":
-		err := database.StartDB(conf)
+		err = database.StartDB(conf)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "MemInit", "Init DB")
 			return err
 		}
 		logger.Zap.Info("MemInit", "Init DB OK")
 	case "savefile":
-		err := savefile.LoadFile(conf)
+		err = savefile.LoadFile(conf)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "MemInit", "Load savefile")
 			return err
@@ -51,9 +53,9 @@ func MemStop(conf *config.Cfg) {
 	}
 }
 
-var pingOK bool
-
 func PingDB(conf *config.Cfg) (error, bool) {
+	pingOK := false
+
 	logger.Zap.Info("PingDB", "Pinging DB")
 
 	switch conf.MemMode {
@@ -61,9 +63,8 @@ func PingDB(conf *config.Cfg) (error, bool) {
 		err := database.DBPing()
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "PingDB", "Pinging DB")
-			return err, pingOK
+			return err, false
 		}
-
 		pingOK = true
 	default:
 		pingOK = false
@@ -72,24 +73,27 @@ func PingDB(conf *config.Cfg) (error, bool) {
 	return nil, pingOK
 }
 
-func StorePair(conf *config.Cfg, shortID, fullURL string) error {
+func StorePair(conf *config.Cfg, shortID, fullURL string) (bool, error) {
 	logger.Zap.Info("StorePair", "Running")
 
-	memstorage.StoreURLIDPair(shortID, fullURL)
+	memstorage.Store.Set(shortID, fullURL)
+
+	var err error
+	var exists bool
 
 	switch conf.MemMode {
 	case "postgres":
-		err := database.AddOne(conf, shortID, fullURL)
+		exists, err = database.AddOne(conf, shortID, fullURL)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePair", "AddOne to DB")
-			return err
+			return false, err
 		}
 		logger.Zap.Info("StorePair", "AddOne to DB OK")
 	case "savefile":
-		err := savefile.SaveFile(conf)
+		err = savefile.SaveFile(conf)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePair", "Save savefile")
-			return err
+			return false, err
 		}
 		logger.Zap.Info("StorePair", "Save savefile OK")
 	case "memstore":
@@ -98,11 +102,11 @@ func StorePair(conf *config.Cfg, shortID, fullURL string) error {
 		logger.Zap.Info("StorePair", "Wrong MemMode")
 	}
 
-	return nil
+	return exists, nil
 }
 
 func CheckPair(conf *config.Cfg, queryID string) (string, error) {
-	fullURL := memstorage.URLStore[queryID]
+	fullURL, _ := memstorage.Store.Get(queryID)
 
 	return fullURL, nil
 }
@@ -118,33 +122,28 @@ type ResponseEntry struct {
 }
 
 func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
-	logger.Zap.Info("BatchHandler. Start")
+	logger.Zap.Info("ProcessBatch. Start")
 
 	var responseBatch []ResponseEntry
 
-	for v := range requestBatch {
-		tempCorrelationID := requestBatch[v].CorrelationID
-		logger.Zap.Infof("BatchHandler. tempCorrelationID run %v: %s", v, tempCorrelationID)
-		tempOriginalURL := requestBatch[v].OriginalURL
-		logger.Zap.Infof("BatchHandler. tempOriginalURL run %v: %s", v, tempOriginalURL)
+	for _, entry := range requestBatch {
+		logger.Zap.Infof("ProcessBatch. Processing entry with CorrelationID: %s",
+			entry.CorrelationID)
 
-		tempShortURL, tempShortID := urlmaker.ProcessURL(conf, tempOriginalURL)
-		logger.Zap.Infof("BatchHandler. tempShortURL run %v: %s", v, tempShortURL)
-		logger.Zap.Infof("BatchHandler. tempShortID run %v: %s", v, tempShortID)
+		shortURL, shortID := urlmaker.ProcessURL(conf, entry.OriginalURL)
 
 		responseBatch = append(responseBatch, ResponseEntry{
-			CorrelationID: tempCorrelationID,
-			ShortURL:      tempShortURL,
+			CorrelationID: entry.CorrelationID,
+			ShortURL:      shortURL,
 		})
 
-		err := StorePair(conf, tempShortID, tempOriginalURL)
-		if err != nil {
-			logger.Zap.Errorw(err.Error(), "BatchHandler", "StorePair from batch")
+		if _, err := StorePair(conf, shortID, entry.OriginalURL); err != nil {
+			logger.Zap.Errorw(err.Error(), "ProcessBatch", "StorePair from batch")
 			return nil, err
 		}
 	}
 
-	logger.Zap.Info("BatchHandler. Processed batch")
+	logger.Zap.Info("ProcessBatch. Batch processed")
 	return responseBatch, nil
 }
 
@@ -198,7 +197,9 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 }
 
 func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shortID, fullURL string) error {
-	memstorage.StoreURLIDPair(shortID, fullURL)
+	logger.Zap.Info("StorePairTransaction. Start")
+
+	memstorage.Store.Set(shortID, fullURL)
 
 	var err error
 	switch conf.MemMode {
@@ -208,7 +209,6 @@ func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shor
 			logger.Zap.Errorw(err.Error(), "StorePairTransaction", "AddOneTransaction to DB")
 			return err
 		}
-
 	case "savefile":
 	case "memstore":
 	default:
@@ -219,7 +219,6 @@ func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shor
 }
 
 // Перед отправкой хочу сделать следующее
-// 1) mutex
-// 2) "/api/user/urls" и JWT-токены
-// 3) DB через интерфейсы
-// 4) многопоточность
+// 1) "/api/user/urls" и JWT-токены
+// 2) DB через интерфейсы
+// 3) unit-тесты
