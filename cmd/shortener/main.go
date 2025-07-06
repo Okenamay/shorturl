@@ -8,13 +8,11 @@ import (
 )
 
 func main() {
-
-	conf := config.InitConfig()
-
 	if err := logger.InitLogger(); err != nil {
 		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
 	}
-	defer logger.Zap.Sync()
+
+	conf := config.InitConfig()
 
 	err := memselect.MemInit(conf)
 	if err != nil {
@@ -28,4 +26,6 @@ func main() {
 	if err != nil {
 		logger.Zap.Fatalw(err.Error(), "Main", "Start server")
 	}
+
+	defer logger.Zap.Sync()
 }
