@@ -13,10 +13,8 @@ import (
 )
 
 func TestBatchHandlerTransaction(t *testing.T) {
-	// Reset storage for this test.
 	memstorage.Store = memstorage.NewURLMap()
 
-	// Prepare a batch request
 	requestPayload := []RequestEntry{
 		{CorrelationID: "1", OriginalURL: "https://google.com"},
 		{CorrelationID: "2", OriginalURL: "https://yandex.ru"},
@@ -58,7 +56,6 @@ func TestBatchHandlerTransaction(t *testing.T) {
 			result := w.Result()
 			defer result.Body.Close()
 
-			// Assertions
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 

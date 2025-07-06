@@ -127,32 +127,6 @@ type ResponseEntry struct {
 	ShortURL      string `json:"short_url"`
 }
 
-func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
-	logger.Zap.Info("ProcessBatch. Start")
-
-	var responseBatch []ResponseEntry
-
-	for _, entry := range requestBatch {
-		logger.Zap.Infof("ProcessBatch. Processing entry with CorrelationID: %s",
-			entry.CorrelationID)
-
-		shortURL, shortID := urlmaker.ProcessURL(conf, entry.OriginalURL)
-
-		responseBatch = append(responseBatch, ResponseEntry{
-			CorrelationID: entry.CorrelationID,
-			ShortURL:      shortURL,
-		})
-
-		if _, err := StorePair(conf, shortID, entry.OriginalURL); err != nil {
-			logger.Zap.Errorw(err.Error(), "ProcessBatch", "StorePair from batch")
-			return nil, err
-		}
-	}
-
-	logger.Zap.Info("ProcessBatch. Batch processed")
-	return responseBatch, nil
-}
-
 func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
 	logger.Zap.Info("ProcessBatchTransaction. Start")
 
@@ -230,7 +204,3 @@ func GetUserURLs(conf *config.Cfg, userID string) ([]database.UserURL, error) {
 	}
 	return database.GetUserURLs(userID)
 }
-
-// Перед отправкой хочу сделать следующее
-// 1) DB через интерфейсы
-// 2) unit-тесты

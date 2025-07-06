@@ -21,7 +21,6 @@ func Launch(conf *config.Cfg) error {
 	// Публичные маршруты:
 	router.Get("/ping", handlers.PingHandler(conf))
 	router.Post("/api/shorten", handlers.JSONHandler(conf))
-	// router.Post("/api/shorten/batch", handlers.BatchHandler(conf))
 	router.Post("/api/shorten/batch", handlers.BatchHandlerTransaction(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", handlers.ShortenHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
@@ -30,7 +29,7 @@ func Launch(conf *config.Cfg) error {
 	router.Group(func(r chi.Router) {
 		r.Use(auth.Authenticator)
 		r.Post("/api/user/urls", handlers.ShortenHandler(conf))
-		r.Get("/api/user/urls", handlers.UserURLsHandler(conf))
+		r.Get("/api/user/urls", handlers.UserURLsHandler(conf)) // Get all URLs for the authenticated user
 	})
 
 	server := http.Server{

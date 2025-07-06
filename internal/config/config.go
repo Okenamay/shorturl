@@ -17,8 +17,8 @@ const (
 	SaveFile    = "/tmp/short-url-db.json"                       // Имя файла-хранилища
 	PostgreDSN  = "postgresql://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
 	Verbose     = false                                          // Флаг детальности логов. !!! Временная заглушка
-	MigrID      = ""                                             // "20250520160000"                               // Дефолтная миграция, заглушка
-	MigrDir     = ""                                             // "up"                                           // Дефолтный роллбек, заглушка
+	MigrID      = ""                                             // Заглушка
+	MigrDir     = ""                                             // Заглушка
 	DBReinit    = true                                           // Флаг переинициализации БД при старте
 	AuthKey     = "secret_key"                                   // Ключ авторизации.
 )
