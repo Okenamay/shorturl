@@ -25,10 +25,11 @@ var Conf *config.Cfg
 
 func TestMain(m *testing.M) {
 	if err := logger.InitLogger(); err != nil {
-		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
+		logger.Zap.Fatalw(err.Error(), "Tests", "Start logger")
 	}
 
 	Conf = config.InitConfig()
+	Conf.MemMode = "memstore"
 
 	os.Exit(m.Run())
 }
