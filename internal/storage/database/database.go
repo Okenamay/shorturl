@@ -121,15 +121,15 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) (bool, error) {
 	}
 
 	var exists bool
-	err := DBPool.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).
-		Scan(&exists)
-	if err == nil {
-		logger.Zap.Infof("AddOne. DB entry '%s' already exists with short_id %s", fullURL, exists)
-		return true, nil
-	}
-	if err != pgx.ErrNoRows {
+	err := DBPool.QueryRow(context.Background(),
+		"SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).Scan(&exists)
+	if err != nil {
 		logger.Zap.Errorw("AddOne. DB entry check error", "error", err)
 		return false, err
+	}
+	if exists {
+		logger.Zap.Infof("AddOne. DB entry '%s' already exists", fullURL)
+		return true, nil
 	}
 
 	_, errA := DBPool.Exec(context.Background(),

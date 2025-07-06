@@ -20,7 +20,7 @@ func main() {
 	}
 	defer memselect.MemStop(conf)
 
-	logger.Zap.Infof("Starting server on port: ", conf.ServerPort)
+	logger.Zap.Infof("Starting server on port: %s", conf.ServerPort)
 
 	err = router.Launch(conf)
 	if err != nil {
