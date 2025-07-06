@@ -76,38 +76,39 @@ func PingDB(conf *config.Cfg) (error, bool) {
 func StorePair(conf *config.Cfg, shortID, fullURL string) (bool, error) {
 	logger.Zap.Info("StorePair", "Running")
 
-	memstorage.Store.Set(shortID, fullURL)
-
-	var err error
-	var exists bool
+	_, alreadyExists := memstorage.Store.Get(shortID)
 
 	switch conf.MemMode {
 	case "postgres":
-		exists, err = database.AddOne(conf, shortID, fullURL)
+		dbExists, err := database.AddOne(conf, shortID, fullURL)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePair", "AddOne to DB")
 			return false, err
 		}
-		if exists {
-			logger.Zap.Info("StorePair. DB entry already exists!")
-			return false, err
-		} else {
-			logger.Zap.Info("StorePair. AddOne to DB OK")
-		}
+
+		memstorage.Store.Set(shortID, fullURL)
+
+		logger.Zap.Info("StorePair. Save to DB OK")
+		return dbExists, nil
 	case "savefile":
-		err = savefile.SaveFile(conf)
-		if err != nil {
+		memstorage.Store.Set(shortID, fullURL)
+
+		if err := savefile.SaveFile(conf); err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePair", "Save savefile")
 			return false, err
 		}
+
 		logger.Zap.Info("StorePair. Save savefile OK")
+		return alreadyExists, nil
 	case "memstore":
+		memstorage.Store.Set(shortID, fullURL)
+
 		logger.Zap.Info("StorePair. Memstore OK")
+		return alreadyExists, nil
 	default:
 		logger.Zap.Info("StorePair. Wrong MemMode")
+		return false, nil
 	}
-
-	return exists, nil
 }
 
 func CheckPair(conf *config.Cfg, queryID string) (string, error) {

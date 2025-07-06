@@ -13,7 +13,6 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
 	"github.com/go-chi/chi/v5"
@@ -34,121 +33,121 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestShortenHandler(t *testing.T) {
-	type want struct {
-		code        int
-		response    string
-		contentType string
-	}
+// func TestShortenHandler(t *testing.T) {
+// 	type want struct {
+// 		code        int
+// 		response    string
+// 		contentType string
+// 	}
 
-	type request struct {
-		method string
-		url    string
-		body   []byte
-	}
+// 	type request struct {
+// 		method string
+// 		url    string
+// 		body   []byte
+// 	}
 
-	tests := []struct {
-		name    string
-		request request
-		want    want
-	}{
-		{
-			name: "ShortenHandler_Correct_Method",
-			request: request{
-				method: http.MethodPost,
-				url:    "/",
-				body:   []byte("https://scryfall.com"),
-			},
-			want: want{
-				code:        201,
-				response:    "",
-				contentType: "text/plain",
-			},
-		},
-		{
-			name: "ShortenHandler_Incorrect_Method",
-			request: request{
-				method: http.MethodGet,
-				url:    "/",
-				body:   []byte("https://www.mtggoldfish.com/"),
-			},
-			want: want{
-				code:        405,
-				response:    "",
-				contentType: "",
-			},
-		},
-		{
-			name: "ShortenHandler_Incorrect_Scheme",
-			request: request{
-				method: http.MethodPost,
-				url:    "/",
-				body:   []byte("ftp://tcgplayer.com/"),
-			},
-			want: want{
-				code:        400,
-				response:    "",
-				contentType: "text/plain; charset=utf-8",
-			},
-		},
-		{
-			name: "ShortenHandler_Incorrect_URL",
-			request: request{
-				method: http.MethodPost,
-				url:    "/",
-				body:   []byte("hilmar.v.petursson@ccpgames.com"),
-			},
-			want: want{
-				code:        400,
-				response:    "",
-				contentType: "text/plain; charset=utf-8",
-			},
-		},
-		{
-			name: "ShortenHandler_Conflict_URL_Exists",
-			request: request{
-				method: http.MethodPost,
-				url:    "/",
-				body:   []byte("https://google.com/maps"),
-			},
-			want: want{
-				code:        http.StatusConflict,
-				contentType: "text/plain",
-			},
-		},
-	}
+// 	tests := []struct {
+// 		name    string
+// 		request request
+// 		want    want
+// 	}{
+// 		{
+// 			name: "ShortenHandler_Correct_Method",
+// 			request: request{
+// 				method: http.MethodPost,
+// 				url:    "/",
+// 				body:   []byte("https://scryfall.com"),
+// 			},
+// 			want: want{
+// 				code:        201,
+// 				response:    "",
+// 				contentType: "text/plain",
+// 			},
+// 		},
+// 		{
+// 			name: "ShortenHandler_Incorrect_Method",
+// 			request: request{
+// 				method: http.MethodGet,
+// 				url:    "/",
+// 				body:   []byte("https://www.mtggoldfish.com/"),
+// 			},
+// 			want: want{
+// 				code:        405,
+// 				response:    "",
+// 				contentType: "",
+// 			},
+// 		},
+// 		{
+// 			name: "ShortenHandler_Incorrect_Scheme",
+// 			request: request{
+// 				method: http.MethodPost,
+// 				url:    "/",
+// 				body:   []byte("ftp://tcgplayer.com/"),
+// 			},
+// 			want: want{
+// 				code:        400,
+// 				response:    "",
+// 				contentType: "text/plain; charset=utf-8",
+// 			},
+// 		},
+// 		{
+// 			name: "ShortenHandler_Incorrect_URL",
+// 			request: request{
+// 				method: http.MethodPost,
+// 				url:    "/",
+// 				body:   []byte("hilmar.v.petursson@ccpgames.com"),
+// 			},
+// 			want: want{
+// 				code:        400,
+// 				response:    "",
+// 				contentType: "text/plain; charset=utf-8",
+// 			},
+// 		},
+// 		{
+// 			name: "ShortenHandler_Conflict_URL_Exists",
+// 			request: request{
+// 				method: http.MethodPost,
+// 				url:    "/",
+// 				body:   []byte("https://google.com/maps"),
+// 			},
+// 			want: want{
+// 				code:        http.StatusConflict,
+// 				contentType: "text/plain",
+// 			},
+// 		},
+// 	}
 
-	router := chi.NewRouter()
-	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", ShortenHandler(Conf))
+// 	router := chi.NewRouter()
+// 	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", ShortenHandler(Conf))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			memstorage.Store = memstorage.NewURLMap()
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			memstorage.Store = memstorage.NewURLMap()
 
-			if tt.name == "ShortenHandler_Conflict_When_URL_Exists" {
-				_, shortID := urlmaker.ProcessURL(Conf, string(tt.request.body))
-				_, err := memselect.StorePair(Conf, shortID, string(tt.request.body))
-				require.NoError(t, err)
-			}
+// 			if tt.name == "ShortenHandler_Conflict_When_URL_Exists" {
+// 				_, shortID := urlmaker.ProcessURL(Conf, string(tt.request.body))
+// 				_, err := memselect.StorePair(Conf, shortID, string(tt.request.body))
+// 				require.NoError(t, err)
+// 			}
 
-			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, request)
+// 			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
+// 			w := httptest.NewRecorder()
+// 			router.ServeHTTP(w, request)
 
-			result := w.Result()
-			defer result.Body.Close()
+// 			result := w.Result()
+// 			defer result.Body.Close()
 
-			require.Equal(t, tt.want.code, result.StatusCode)
-			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
+// 			require.Equal(t, tt.want.code, result.StatusCode)
+// 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code == http.StatusCreated || tt.want.code == http.StatusConflict {
-				body, err := io.ReadAll(result.Body)
-				require.NoError(t, err)
-				assert.NotEmpty(t, string(body))
-			}
-		})
-	}
-}
+// 			if tt.want.code == http.StatusCreated || tt.want.code == http.StatusConflict {
+// 				body, err := io.ReadAll(result.Body)
+// 				require.NoError(t, err)
+// 				assert.NotEmpty(t, string(body))
+// 			}
+// 		})
+// 	}
+// }
 
 func TestRedirectHandler(t *testing.T) {
 	memstorage.Store = memstorage.NewURLMap()
@@ -225,6 +224,132 @@ func TestRedirectHandler(t *testing.T) {
 
 			if result.StatusCode != http.StatusMethodNotAllowed {
 				require.Equal(t, originalURL, result.Header.Get("Location"))
+			}
+		})
+	}
+}
+
+func TestShortenHandler(t *testing.T) {
+	type want struct {
+		code        int
+		contentType string
+	}
+
+	type request struct {
+		method string
+		url    string
+		body   []byte
+	}
+
+	tests := []struct {
+		name    string
+		setup   func()
+		request request
+		want    want
+	}{
+		{
+			name: "ShortenHandler_Correct_Method_New_URL",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+			},
+			request: request{
+				method: http.MethodPost,
+				url:    "/",
+				body:   []byte("https://new-url.com"),
+			},
+			want: want{
+				code:        http.StatusCreated,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name: "ShortenHandler_Conflict_When_URL_Exists",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+				existingURL := "https://existing-url.com"
+				_, shortID := urlmaker.ProcessURL(Conf, existingURL)
+				memstorage.Store.Set(shortID, existingURL)
+			},
+			request: request{
+				method: http.MethodPost,
+				url:    "/",
+				body:   []byte("https://existing-url.com"),
+			},
+			want: want{
+				code:        http.StatusConflict,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name: "ShortenHandler_Incorrect_Method",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+			},
+			request: request{
+				method: http.MethodGet,
+				url:    "/",
+				body:   []byte("https://www.mtggoldfish.com/"),
+			},
+			want: want{
+				code:        http.StatusMethodNotAllowed,
+				contentType: "",
+			},
+		},
+		{
+			name: "ShortenHandler_Incorrect_Scheme",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+			},
+			request: request{
+				method: http.MethodPost,
+				url:    "/",
+				body:   []byte("ftp://tcgplayer.com/"),
+			},
+			want: want{
+				code:        400,
+				contentType: "text/plain; charset=utf-8",
+			},
+		},
+		{
+			name: "ShortenHandler_Incorrect_URL",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+			},
+			request: request{
+				method: http.MethodPost,
+				url:    "/",
+				body:   []byte("hilmar.v.petursson@ccpgames.com"),
+			},
+			want: want{
+				code:        400,
+				contentType: "text/plain; charset=utf-8",
+			},
+		},
+	}
+
+	router := chi.NewRouter()
+	router.Post("/", ShortenHandler(Conf))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, request)
+
+			result := w.Result()
+			defer result.Body.Close()
+
+			require.Equal(t, tt.want.code, result.StatusCode)
+			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
+
+			if tt.want.code == http.StatusCreated || tt.want.code == http.StatusConflict {
+				body, err := io.ReadAll(result.Body)
+				require.NoError(t, err)
+				assert.NotEmpty(t, string(body))
 			}
 		})
 	}

@@ -1,9 +1,11 @@
 package memselect
 
 import (
+	"os"
 	"testing"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,15 +13,15 @@ import (
 
 var Conf *config.Cfg
 
-// func TestMain(m *testing.M) {
-// 	if err := logger.InitLogger(); err != nil {
-// 		panic("failed to initialize logger for tests: " + err.Error())
-// 	}
-// 	Conf = config.InitConfig()
-// 	Conf.MemMode = "memstore"
+func TestMain(m *testing.M) {
+	if err := logger.InitLogger(); err != nil {
+		panic("failed to initialize logger for tests: " + err.Error())
+	}
+	Conf = config.InitConfig()
+	Conf.MemMode = "memstore"
 
-// 	os.Exit(m.Run())
-// }
+	os.Exit(m.Run())
+}
 
 func TestStoreAndCheckPair(t *testing.T) {
 	memstorage.Store = memstorage.NewURLMap()
