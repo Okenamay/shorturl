@@ -88,18 +88,23 @@ func StorePair(conf *config.Cfg, shortID, fullURL string) (bool, error) {
 			logger.Zap.Errorw(err.Error(), "StorePair", "AddOne to DB")
 			return false, err
 		}
-		logger.Zap.Info("StorePair", "AddOne to DB OK")
+		if exists {
+			logger.Zap.Info("StorePair. DB entry already exists!")
+			return false, err
+		} else {
+			logger.Zap.Info("StorePair. AddOne to DB OK")
+		}
 	case "savefile":
 		err = savefile.SaveFile(conf)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePair", "Save savefile")
 			return false, err
 		}
-		logger.Zap.Info("StorePair", "Save savefile OK")
+		logger.Zap.Info("StorePair. Save savefile OK")
 	case "memstore":
-		logger.Zap.Info("StorePair", "Memstore OK")
+		logger.Zap.Info("StorePair. Memstore OK")
 	default:
-		logger.Zap.Info("StorePair", "Wrong MemMode")
+		logger.Zap.Info("StorePair. Wrong MemMode")
 	}
 
 	return exists, nil
@@ -226,6 +231,5 @@ func GetUserURLs(conf *config.Cfg, userID string) ([]database.UserURL, error) {
 }
 
 // Перед отправкой хочу сделать следующее
-// 1) "/api/user/urls" и JWT-токены
-// 2) DB через интерфейсы
-// 3) unit-тесты
+// 1) DB через интерфейсы
+// 2) unit-тесты

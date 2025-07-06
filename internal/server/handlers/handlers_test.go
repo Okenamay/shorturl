@@ -13,6 +13,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
+	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
 	"github.com/go-chi/chi/v5"
@@ -102,6 +103,18 @@ func TestShortenHandler(t *testing.T) {
 				contentType: "text/plain; charset=utf-8",
 			},
 		},
+		{
+			name: "ShortenHandler_Conflict_URL_Exists",
+			request: request{
+				method: http.MethodPost,
+				url:    "/",
+				body:   []byte("https://google.com/maps"),
+			},
+			want: want{
+				code:        http.StatusConflict,
+				contentType: "text/plain",
+			},
+		},
 	}
 
 	router := chi.NewRouter()
@@ -109,8 +122,13 @@ func TestShortenHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts := httptest.NewServer(router)
-			defer ts.Close()
+			memstorage.Store = memstorage.NewURLMap()
+
+			if tt.name == "ShortenHandler_Conflict_When_URL_Exists" {
+				_, shortID := urlmaker.ProcessURL(Conf, string(tt.request.body))
+				_, err := memselect.StorePair(Conf, shortID, string(tt.request.body))
+				require.NoError(t, err)
+			}
 
 			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(tt.request.body))
 			w := httptest.NewRecorder()
@@ -122,13 +140,10 @@ func TestShortenHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != http.StatusBadRequest && tt.want.code != http.StatusMethodNotAllowed {
-				newURLb, err := io.ReadAll(result.Body)
-				newURL := string(newURLb)
+			if tt.want.code == http.StatusCreated || tt.want.code == http.StatusConflict {
+				body, err := io.ReadAll(result.Body)
 				require.NoError(t, err)
-				err = result.Body.Close()
-				require.NoError(t, err)
-				assert.NotEmpty(t, newURL)
+				assert.NotEmpty(t, string(body))
 			}
 		})
 	}
