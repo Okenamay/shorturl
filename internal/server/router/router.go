@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
@@ -17,12 +18,20 @@ func Launch(conf *config.Cfg) error {
 
 	router.Use(logger.WithLogging)
 
+	// Публичные маршруты:
 	router.Get("/ping", handlers.PingHandler(conf))
 	router.Post("/api/shorten", handlers.JSONHandler(conf))
 	// router.Post("/api/shorten/batch", handlers.BatchHandler(conf))
 	router.Post("/api/shorten/batch", handlers.BatchHandlerTransaction(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", handlers.ShortenHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
+
+	// Маршруты с аутентификацией:
+	router.Group(func(r chi.Router) {
+		r.Use(auth.Authenticator)
+		r.Post("/api/user/urls", handlers.ShortenHandler(conf))
+		r.Get("/api/user/urls", handlers.UserURLsHandler(conf))
+	})
 
 	server := http.Server{
 		Addr:        conf.ServerPort,

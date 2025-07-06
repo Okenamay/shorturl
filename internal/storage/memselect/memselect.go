@@ -218,6 +218,13 @@ func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shor
 	return nil
 }
 
+func GetUserURLs(conf *config.Cfg, userID string) ([]database.UserURL, error) {
+	if conf.MemMode != "postgres" {
+		return nil, nil
+	}
+	return database.GetUserURLs(userID)
+}
+
 // Перед отправкой хочу сделать следующее
 // 1) "/api/user/urls" и JWT-токены
 // 2) DB через интерфейсы

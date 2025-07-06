@@ -43,6 +43,7 @@ func TestParseFlags(t *testing.T) {
 				MigrateID:         MigrID,
 				MigrateDirection:  MigrDir,
 				DBReinitialize:    DBReinit,
+				AuthorizationKey:  AuthKey,
 			},
 		},
 		{
@@ -65,6 +66,7 @@ func TestParseFlags(t *testing.T) {
 				MigrateID:         MigrID,
 				MigrateDirection:  MigrDir,
 				DBReinitialize:    DBReinit,
+				AuthorizationKey:  AuthKey,
 			},
 		},
 		{
@@ -87,6 +89,7 @@ func TestParseFlags(t *testing.T) {
 				MigrateID:         MigrID,
 				MigrateDirection:  MigrDir,
 				DBReinitialize:    DBReinit,
+				AuthorizationKey:  AuthKey,
 			},
 		},
 		{
@@ -109,6 +112,7 @@ func TestParseFlags(t *testing.T) {
 				MigrateID:         MigrID,
 				MigrateDirection:  MigrDir,
 				DBReinitialize:    DBReinit,
+				AuthorizationKey:  AuthKey,
 			},
 		},
 	}

@@ -20,6 +20,7 @@ const (
 	MigrID      = ""                                             // "20250520160000"                               // Дефолтная миграция, заглушка
 	MigrDir     = ""                                             // "up"                                           // Дефолтный роллбек, заглушка
 	DBReinit    = true                                           // Флаг переинициализации БД при старте
+	AuthKey     = "secret_key"                                   // Ключ авторизации.
 )
 
 type Cfg struct {
@@ -34,6 +35,7 @@ type Cfg struct {
 	MigrateID         string
 	MigrateDirection  string
 	DBReinitialize    bool
+	AuthorizationKey  string
 }
 
 var useFile bool
@@ -66,6 +68,8 @@ func parseFlags() *Cfg {
 		"Направление миграции БД (up = миграция, down = роллбек)")
 	flag.BoolVar(&config.DBReinitialize, "dbx", DBReinit,
 		"Реинициализация БД (bool)")
+	flag.StringVar(&config.AuthorizationKey, "s", AuthKey,
+		"Ключ для генерации JWT-токена")
 	flag.Parse()
 
 	var saveFilePath, postgreDSN string
@@ -116,6 +120,11 @@ func parseFlags() *Cfg {
 			config.DBReinitialize = false
 		}
 		logger.Zap.Infof("EnvVerbose = %s", dbReinitialize)
+	}
+
+	if authorizationKey, ok := os.LookupEnv("AUTH_SECRET_KEY"); ok && authorizationKey != "" {
+		config.AuthorizationKey = authorizationKey
+		logger.Zap.Infof("EnvKey = %s", authorizationKey)
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,

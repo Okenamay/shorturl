@@ -14,7 +14,7 @@ type claims struct {
 	UserID string
 }
 
-const TokenExp = time.Hour * 3
+const TokenExp = time.Hour * 24
 const SecretKey = "supersecretkey"
 
 func buildJWTString(userID string) (string, error) {

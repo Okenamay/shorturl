@@ -153,3 +153,34 @@ func AddOneTransaction(ctx context.Context, tx pgx.Tx, shortID, fullURL string) 
 	}
 	return nil
 }
+
+func GetUserURLs(userID string) ([]UserURL, error) {
+	rows, err := DBPool.Query(context.Background(), "SELECT short_id, url FROM urls WHERE user_id = $1", userID)
+	if err != nil {
+		logger.Zap.Errorw("GetUserURLs. Query failed", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userURLs []UserURL
+	for rows.Next() {
+		var u UserURL
+		if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
+			logger.Zap.Errorw("GetUserURLs. Row scan failed", "error", err)
+			return nil, err
+		}
+		userURLs = append(userURLs, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.Zap.Errorw("GetUserURLs. Row iteration error", "error", err)
+		return nil, err
+	}
+
+	return userURLs, nil
+}
+
+type UserURL struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
