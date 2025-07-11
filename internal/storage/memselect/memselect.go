@@ -1,62 +1,70 @@
 package memselect
 
 import (
+	"context"
+
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
+	pgx "github.com/jackc/pgx/v5"
 )
 
 func MemInit(conf *config.Cfg) error {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "MemInit", "Start logger")
-		return err
-	}
+	logger.Zap.Info("MemInit", "Assessing memory mode")
+
+	var err error
 
 	switch conf.MemMode {
 	case "postgres":
 		err = database.StartDB(conf)
 		if err != nil {
-			sugar.Errorw(err.Error(), "MemInit", "Init DB")
+			logger.Zap.Errorw(err.Error(), "MemInit", "Init DB")
 			return err
 		}
-		sugar.Info("MemInit", "Init DB OK")
+		logger.Zap.Info("MemInit", "Init DB OK")
 	case "savefile":
-		err := savefile.LoadFile(conf)
+		err = savefile.LoadFile(conf)
 		if err != nil {
-			sugar.Errorw(err.Error(), "MemInit", "Load savefile")
+			logger.Zap.Errorw(err.Error(), "MemInit", "Load savefile")
 			return err
 		}
-		sugar.Info("MemInit", "Load savefile OK")
+		logger.Zap.Info("MemInit", "Load savefile OK")
 	case "memstore":
-		sugar.Info("MemInit", "Memstore OK")
+		logger.Zap.Info("MemInit", "Memstore OK")
 	default:
-		sugar.Info("MemInit", "Wrong MemMode")
+		logger.Zap.Info("MemInit", "Wrong MemMode")
 	}
 
 	return nil
 }
 
-var pingOK bool
-
-func PingDB(conf *config.Cfg) (error, bool) {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "PingDB", "Start logger")
-		return err, pingOK
-	}
+func MemStop(conf *config.Cfg) {
+	logger.Zap.Info("MemStop", "Stopping memory")
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.DBPing(conf)
-		if err != nil {
-			sugar.Errorw(err.Error(), "PingDB", "Pinging DB")
-			return err, pingOK
-		}
+		database.StopDB()
+		logger.Zap.Info("MemStop", "Stop DB OK")
+	default:
+		logger.Zap.Info("MemStop", "Nothing to stop for this MemMode")
+	}
+}
 
+func PingDB(conf *config.Cfg) (error, bool) {
+	pingOK := false
+
+	logger.Zap.Info("PingDB", "Pinging DB")
+
+	switch conf.MemMode {
+	case "postgres":
+		err := database.DBPing()
+		if err != nil {
+			logger.Zap.Errorw(err.Error(), "PingDB", "Pinging DB")
+			return err, false
+		}
 		pingOK = true
 	default:
 		pingOK = false
@@ -65,51 +73,46 @@ func PingDB(conf *config.Cfg) (error, bool) {
 	return nil, pingOK
 }
 
-func StorePair(conf *config.Cfg, shortID, fullURL string) error {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "StorePair", "Start logger")
-		return err
-	}
+func StorePair(conf *config.Cfg, shortID, fullURL string) (bool, error) {
+	logger.Zap.Info("StorePair", "Running")
 
-	memstorage.StoreURLIDPair(shortID, fullURL)
+	_, alreadyExists := memstorage.Store.Get(shortID)
 
 	switch conf.MemMode {
 	case "postgres":
-		err = database.AddOne(conf, shortID, fullURL)
+		dbExists, err := database.AddOne(conf, shortID, fullURL)
 		if err != nil {
-			sugar.Errorw(err.Error(), "StorePair", "AddOne to DB")
-			return err
+			logger.Zap.Errorw(err.Error(), "StorePair", "AddOne to DB")
+			return false, err
 		}
-		sugar.Info("StorePair", "AddOne to DB OK")
-	case "savefile":
-		err := savefile.SaveFile(conf)
-		if err != nil {
-			sugar.Errorw(err.Error(), "StorePair", "Save savefile")
-			return err
-		}
-		sugar.Info("StorePair", "Save savefile OK")
-	case "memstore":
-		sugar.Info("StorePair", "Memstore OK")
-	default:
-		sugar.Info("StorePair", "Wrong MemMode")
-	}
 
-	return nil
+		memstorage.Store.Set(shortID, fullURL)
+
+		logger.Zap.Info("StorePair. Save to DB OK")
+		return dbExists, nil
+	case "savefile":
+		memstorage.Store.Set(shortID, fullURL)
+
+		if err := savefile.SaveFile(conf); err != nil {
+			logger.Zap.Errorw(err.Error(), "StorePair", "Save savefile")
+			return false, err
+		}
+
+		logger.Zap.Info("StorePair. Save savefile OK")
+		return alreadyExists, nil
+	case "memstore":
+		memstorage.Store.Set(shortID, fullURL)
+
+		logger.Zap.Info("StorePair. Memstore OK")
+		return alreadyExists, nil
+	default:
+		logger.Zap.Info("StorePair. Wrong MemMode")
+		return false, nil
+	}
 }
 
 func CheckPair(conf *config.Cfg, queryID string) (string, error) {
-	sugar, err := logger.InitLogger()
-	if err != nil {
-		sugar.Errorw(err.Error(), "CheckOne", "Start logger")
-		return "", err
-	}
-
-	// В теории, мы хотим читать из нужного источника, но зачем,
-	// если всё равно при инициализации всё в мапу считали?
-	// Или таки обязательно?
-
-	fullURL := memstorage.URLStore[queryID]
+	fullURL, _ := memstorage.Store.Get(queryID)
 
 	return fullURL, nil
 }
@@ -124,34 +127,80 @@ type ResponseEntry struct {
 	ShortURL      string `json:"short_url"`
 }
 
-func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
-	sugar, _ := logger.InitLogger()
-	sugar.Info("BatchHandler. Start")
+func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
+	logger.Zap.Info("ProcessBatchTransaction. Start")
 
 	var responseBatch []ResponseEntry
+	ctx := context.Background()
 
-	for v := range requestBatch {
-		tempCorrelationID := requestBatch[v].CorrelationID
-		sugar.Infof("BatchHandler. tempCorrelationID run %v: %s", v, tempCorrelationID)
-		tempOriginalURL := requestBatch[v].OriginalURL
-		sugar.Infof("BatchHandler. tempOriginalURL run %v: %s", v, tempOriginalURL)
+	var tx pgx.Tx
+	var err error
+	if conf.MemMode == "postgres" {
+		tx, err = database.DBPool.Begin(ctx)
+		if err != nil {
+			logger.Zap.Errorw("ProcessBatchTransaction. Failed to begin transaction", "error", err)
+			return nil, err
+		}
+		defer tx.Rollback(ctx)
+	}
 
-		tempShortURL, tempShortID := urlmaker.ProcessURL(conf, tempOriginalURL)
-		sugar.Infof("BatchHandler. tempShortURL run %v: %s", v, tempShortURL)
-		sugar.Infof("BatchHandler. tempShortID run %v: %s", v, tempShortID)
+	for _, entry := range requestBatch {
+		shortURL, shortID := urlmaker.ProcessURL(conf, entry.OriginalURL)
 
 		responseBatch = append(responseBatch, ResponseEntry{
-			CorrelationID: tempCorrelationID,
-			ShortURL:      tempShortURL,
+			CorrelationID: entry.CorrelationID,
+			ShortURL:      shortURL,
 		})
 
-		err := StorePair(conf, tempShortID, tempOriginalURL)
-		if err != nil {
-			sugar.Errorw(err.Error(), "BatchHandler", "StorePair from batch")
+		if err := StorePairTransaction(ctx, tx, conf, shortID, entry.OriginalURL); err != nil {
+			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "StorePairTransaction from batch")
 			return nil, err
 		}
 	}
 
-	sugar.Info("BatchHandler. Processed batch")
+	if conf.MemMode == "savefile" {
+		if err := savefile.SaveFile(conf); err != nil {
+			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "Save savefile")
+			return nil, err
+		}
+	}
+
+	if tx != nil {
+		if err := tx.Commit(ctx); err != nil {
+			logger.Zap.Errorw("ProcessBatchTransaction. Failed to commit transaction", "error", err)
+			return nil, err
+		}
+	}
+
+	logger.Zap.Info("ProcessBatchTransaction. Batch processed successfully.")
 	return responseBatch, nil
+}
+
+func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shortID, fullURL string) error {
+	logger.Zap.Info("StorePairTransaction. Start")
+
+	memstorage.Store.Set(shortID, fullURL)
+
+	var err error
+	switch conf.MemMode {
+	case "postgres":
+		err = database.AddOneTransaction(ctx, tx, shortID, fullURL)
+		if err != nil {
+			logger.Zap.Errorw(err.Error(), "StorePairTransaction", "AddOneTransaction to DB")
+			return err
+		}
+	case "savefile":
+	case "memstore":
+	default:
+		logger.Zap.Info("StorePairTransaction", "Wrong MemMode")
+	}
+
+	return nil
+}
+
+func GetUserURLs(conf *config.Cfg, userID string) ([]database.UserURL, error) {
+	if conf.MemMode != "postgres" {
+		return nil, nil
+	}
+	return database.GetUserURLs(userID)
 }

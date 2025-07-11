@@ -3,13 +3,11 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
-	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -17,16 +15,8 @@ import (
 )
 
 func TestJSONHandler(t *testing.T) {
-	conf := config.InitConfig()
-
-	memstorage.URLStore = make(map[string]string)
-	originalURL := "https://topdeck.ru/"
-	result, shortID := urlmaker.ProcessURL(conf, originalURL)
-	memstorage.URLStore[shortID] = originalURL
-
 	type want struct {
 		code        int
-		response    JSONResponse
 		contentType string
 	}
 
@@ -38,47 +28,74 @@ func TestJSONHandler(t *testing.T) {
 
 	tests := []struct {
 		name    string
+		setup   func()
 		request request
 		want    want
 	}{
 		{
-			name: "JSONHandler_Correct_Method",
+			name: "JSONHandler_Correct_Method_New_URL",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+			},
 			request: request{
 				method: http.MethodPost,
 				url:    "/api/shorten",
-				body:   JSONRequest{URL: originalURL},
+				body:   JSONRequest{URL: "https://new-url.com"},
 			},
 			want: want{
-				code:        201,
-				response:    JSONResponse{Result: result},
+				code:        http.StatusCreated,
+				contentType: "application/json",
+			},
+		},
+		{
+			name: "JSONHandler_Conflict_When_URL_Exists",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+				existingURL := "https://existing-url.com"
+				_, shortID := urlmaker.ProcessURL(Conf, existingURL)
+				memstorage.Store.Set(shortID, existingURL)
+			},
+			request: request{
+				method: http.MethodPost,
+				url:    "/api/shorten",
+				body:   JSONRequest{URL: "https://existing-url.com"},
+			},
+			want: want{
+				code:        http.StatusConflict,
 				contentType: "application/json",
 			},
 		},
 		{
 			name: "JSONHandler_Incorrect_Method",
+			setup: func() {
+				memstorage.Store = memstorage.NewURLMap()
+			},
 			request: request{
 				method: http.MethodGet,
 				url:    "/api/shorten",
 				body:   JSONRequest{},
 			},
 			want: want{
-				code:        405,
+				code:        http.StatusMethodNotAllowed,
 				contentType: "",
 			},
 		},
 	}
 
 	router := chi.NewRouter()
-	router.Post("/api/shorten", JSONHandler(conf))
+	router.Post("/api/shorten", JSONHandler(Conf))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+
 			ts := httptest.NewServer(router)
 			defer ts.Close()
 
 			body, _ := json.Marshal(tt.request.body)
-			request := httptest.NewRequest(tt.request.method, tt.request.url, nil)
-			request.Body = io.NopCloser(bytes.NewReader(body))
+			request := httptest.NewRequest(tt.request.method, tt.request.url, bytes.NewReader(body))
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, request)
 
@@ -88,12 +105,11 @@ func TestJSONHandler(t *testing.T) {
 			require.Equal(t, tt.want.code, result.StatusCode)
 			require.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 
-			if tt.want.code != http.StatusBadRequest && tt.want.code != http.StatusMethodNotAllowed {
-				newURL, err := io.ReadAll(result.Body)
+			if tt.want.code == http.StatusCreated || tt.want.code == http.StatusConflict {
+				var resp JSONResponse
+				err := json.NewDecoder(result.Body).Decode(&resp)
 				require.NoError(t, err)
-				err = result.Body.Close()
-				require.NoError(t, err)
-				assert.NotEmpty(t, newURL)
+				assert.NotEmpty(t, resp.Result)
 			}
 		})
 	}

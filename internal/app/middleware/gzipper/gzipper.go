@@ -22,7 +22,7 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 
 func Compressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		logger.Zap.Info("Compressor. Start")
 
 		acceptEncoding := r.Header.Values("Accept-Encoding")
 		var isGzip bool
@@ -34,7 +34,7 @@ func Compressor(next http.Handler) http.Handler {
 		}
 
 		if !isGzip {
-			sugar.Info("Compressor. GZIP not accepted")
+			logger.Zap.Info("Compressor. GZIP not accepted")
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -47,7 +47,7 @@ func Compressor(next http.Handler) http.Handler {
 		isHTML := strings.Contains(contentType, "text/html")
 
 		if !isJSON && !isHTML {
-			sugar.Info("Compressor. Content-Type not for compression")
+			logger.Zap.Info("Compressor. Content-Type not for compression")
 			w.Write(buf.Bytes())
 			return
 		}
@@ -56,7 +56,7 @@ func Compressor(next http.Handler) http.Handler {
 
 		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		if err != nil {
-			sugar.Infow("Compressor. Compression", "error", err)
+			logger.Zap.Infow("Compressor. Compression", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -65,7 +65,7 @@ func Compressor(next http.Handler) http.Handler {
 
 		_, err = gz.Write(buf.Bytes())
 		if err != nil {
-			sugar.Infow("Compressor. gz.Write", "error", err)
+			logger.Zap.Infow("Compressor. gz.Write", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -74,13 +74,13 @@ func Compressor(next http.Handler) http.Handler {
 
 func Decompressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
+		logger.Zap.Info("Decompressor. Start")
 
 		contentEncoding := r.Header.Values("Content-Encoding")
 		isGzip := slices.Contains(contentEncoding, "gzip")
 		if isGzip {
 
-			sugar.Info("Decompressor. Starting GZIP decompression")
+			logger.Zap.Info("Decompressor. Starting GZIP decompression")
 
 			gz, err := gzip.NewReader(r.Body)
 			if err != nil {

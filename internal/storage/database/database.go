@@ -7,45 +7,36 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
-	DBPool *pgxpool.Pool
+	DBPool      *pgxpool.Pool
+	EntryExists bool
+	err         error
 )
 
-// Создадим таблицу в базе данных:
 func StartDB(conf *config.Cfg) error {
-	sugar, _ := logger.InitLogger()
-	sugar.Info("StartDB. Start")
+	logger.Zap.Info("StartDB. Start")
 
-	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
+	DBPool, err = pgxpool.New(context.Background(), conf.PostgreDSN)
 	if err != nil {
-		sugar.Errorw("Init. Failed to connect pgxpool", "error", err)
+		logger.Zap.Errorw("StartDB. Failed to connect pgxpool", "error", err)
 		return err
 	}
-	defer dbPool.Close()
 
-	sql := fmt.Sprintf(`
-    CREATE TABLE IF NOT EXISTS urls (
-        id BIGSERIAL PRIMARY KEY,
-        url VARCHAR(1024),
-        short_id VARCHAR(%d)
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
-    `, conf.ShortIDLen)
+	logger.Zap.Info("StartDB. Pool initialized.")
 
-	_, err = dbPool.Exec(context.Background(), sql)
-	if err != nil {
-		sugar.Errorw("Init. Failed to create table", "error", err)
-		return fmt.Errorf("ошибка при создании таблицы: %w", err)
+	if conf.DBReinitialize {
+		if err := DBReinit(conf); err != nil {
+			return err
+		}
 	}
 
-	sugar.Info("StartDB. Table created or already exists")
-
-	rows, err := dbPool.Query(context.Background(), "SELECT url, short_id FROM urls")
+	rows, err := DBPool.Query(context.Background(), "SELECT url, short_id FROM urls")
 	if err != nil {
-		sugar.Errorw("Init. Failed to read table", "error", err)
+		logger.Zap.Errorw("StartDB. Failed to read table", "error", err)
 		return err
 	}
 	defer rows.Close()
@@ -53,75 +44,143 @@ func StartDB(conf *config.Cfg) error {
 	for rows.Next() {
 		var fullURL, shortID string
 		if err := rows.Scan(&fullURL, &shortID); err != nil {
-			sugar.Errorw("Init. Failed to scan row", "error", err)
+			logger.Zap.Errorw("StartDB. Failed to scan row", "error", err)
 			return err
 		}
-		memstorage.StoreURLIDPair(shortID, fullURL)
+
+		memstorage.Store.Set(shortID, fullURL)
 	}
 
 	if err := rows.Err(); err != nil {
-		sugar.Errorw("Init. Failed to iterate rows", "error", err)
-		return fmt.Errorf("ошибка при обработке строк: %w", err)
+		logger.Zap.Errorf("StartDB. Failed to iterate rows: %w", err)
+		return err
 	}
 
-	sugar.Infof("StartDB. Loaded %d records into memory", len(memstorage.URLStore))
+	logger.Zap.Infof("StartDB. Loaded %d records into memory", len(memstorage.Store.GetAll()))
 
 	return nil
 }
 
-func DBPing(conf *config.Cfg) error {
-	sugar, _ := logger.InitLogger()
-	sugar.Info("DBPing. Start")
+func DBReinit(conf *config.Cfg) error {
+	logger.Zap.Info("DBReinit. Start")
 
-	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
+	sql := fmt.Sprintf(`
+    CREATE TABLE IF NOT EXISTS urls (
+        id BIGSERIAL PRIMARY KEY,
+        url VARCHAR(1024) UNIQUE,
+        short_id VARCHAR(%d) UNIQUE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
+    `, conf.ShortIDLen)
+
+	if DBPool == nil {
+		logger.Zap.Error("DBReinit. DB pool not initialized")
+		return fmt.Errorf("DBReinit. DB pool is not initialized")
+	}
+
+	_, err := DBPool.Exec(context.Background(), sql)
 	if err != nil {
-		sugar.Errorw("DBPing. DB pool error", "error", err)
+		logger.Zap.Errorf("DBReinit. Failed to create table: %w", err)
 		return err
 	}
-	defer dbPool.Close()
 
-	err = dbPool.Ping(context.Background())
+	logger.Zap.Info("DBReinit. Table created or already exists")
+	return nil
+}
+
+func StopDB() {
+	if DBPool != nil {
+		DBPool.Close()
+		logger.Zap.Info("StopDB. Database connection pool closed.")
+	}
+}
+
+func DBPing() error {
+	logger.Zap.Info("DBPing. Start")
+
+	if DBPool == nil {
+		logger.Zap.Error("DBPing. DB pool not initialized")
+		return fmt.Errorf("DBPing. DB pool not initialized")
+	}
+
+	err := DBPool.Ping(context.Background())
 	if err != nil {
-		sugar.Errorw("DBPing. DB ping error", "error", err)
+		logger.Zap.Errorw("DBPing. DB ping error", "error", err)
 		return err
 	}
 
 	return nil
 }
 
-func AddOne(conf *config.Cfg, shortID, fullURL string) error {
-	sugar, _ := logger.InitLogger()
-	sugar.Info("AddOne. Start")
+func AddOne(conf *config.Cfg, shortID, fullURL string) (bool, error) {
+	logger.Zap.Info("AddOne. Start")
 
-	dbPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
-	if err != nil {
-		sugar.Errorw("AddOne. DB pool error", "error", err)
-		return err
+	if DBPool == nil {
+		logger.Zap.Error("AddOne. DB pool is not initialized")
+		return false, fmt.Errorf("AddOne. DB pool is not initialized")
 	}
-	defer dbPool.Close()
 
 	var exists bool
-	err = dbPool.QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).
-		Scan(&exists)
+	err := DBPool.QueryRow(context.Background(),
+		"SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).Scan(&exists)
 	if err != nil {
-		sugar.Errorw("AddOne. DB entry check error", "error", err)
-		return err
+		logger.Zap.Errorw("AddOne. DB entry check error", "error", err)
+		return false, err
 	}
 	if exists {
-		sugar.Infof("AddOne. DB entry '%s' already exists", fullURL)
-		return nil
+		logger.Zap.Infof("AddOne. DB entry '%s' already exists", fullURL)
+		return true, nil
 	}
 
-	_, err = dbPool.Exec(context.Background(),
+	_, errA := DBPool.Exec(context.Background(),
 		"INSERT INTO urls (url, short_id) VALUES ($1, $2)",
 		fullURL, shortID)
-	if err != nil {
-		sugar.Errorw("AddOne. Error adding DB entry", "error", err)
-		sugar.Infof("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
-		return err
+	if errA != nil {
+		logger.Zap.Infof("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
+		logger.Zap.Errorw("AddOne. Error adding DB entry", "error", errA)
+		return false, errA
 	}
 
-	sugar.Infof("AddOne. DB entry successful: URL '%s', ShortID '%s'", fullURL, shortID)
+	logger.Zap.Infof("AddOne. DB entry successful: URL '%s', ShortID '%s'", fullURL, shortID)
+	return false, nil
+}
 
+func AddOneTransaction(ctx context.Context, tx pgx.Tx, shortID, fullURL string) error {
+	_, err := tx.Exec(ctx, "INSERT INTO urls (url, short_id) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING", fullURL, shortID)
+	if err != nil {
+		logger.Zap.Errorw("AddOneTransaction. Error adding DB entry", "error", err)
+		return err
+	}
 	return nil
+}
+
+func GetUserURLs(userID string) ([]UserURL, error) {
+	rows, err := DBPool.Query(context.Background(), "SELECT short_id, url FROM urls WHERE user_id = $1", userID)
+	if err != nil {
+		logger.Zap.Errorw("GetUserURLs. Query failed", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userURLs []UserURL
+	for rows.Next() {
+		var u UserURL
+		if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
+			logger.Zap.Errorw("GetUserURLs. Row scan failed", "error", err)
+			return nil, err
+		}
+		userURLs = append(userURLs, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.Zap.Errorw("GetUserURLs. Row iteration error", "error", err)
+		return nil, err
+	}
+
+	return userURLs, nil
+}
+
+type UserURL struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }

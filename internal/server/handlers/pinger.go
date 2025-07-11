@@ -11,21 +11,20 @@ import (
 // PingHandler проверяет соединение с базой данных и отвечает на пинг:
 func PingHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
-		sugar.Info("PingHandler. Start")
+		logger.Zap.Info("PingHandler. Start")
 
 		err, pingOK := memselect.PingDB(conf)
 		if err != nil {
-			sugar.Errorw("PingHandler. DB ping error", "error", err)
+			logger.Zap.Errorw("PingHandler. DB ping error", "error", err)
 			http.Error(w, "Database connection error", http.StatusInternalServerError)
 			return
 		} else {
-			sugar.Info("PingHandler. DB ping success")
+			logger.Zap.Info("PingHandler. DB ping success")
 		}
 		if !pingOK {
-			sugar.Infof("Database DSN: %s. MemMode: %s.",
+			logger.Zap.Infof("Database DSN: %s. MemMode: %s.",
 				conf.PostgreDSN, conf.MemMode)
-			sugar.Errorw("PingHandler. DB ping failed", "error", err)
+			logger.Zap.Errorw("PingHandler. DB ping failed", "error", err)
 			http.Error(w, "Database not enabled", http.StatusInternalServerError)
 			return
 		}

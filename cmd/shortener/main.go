@@ -7,24 +7,25 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
-// Main:
 func main() {
+	if err := logger.InitLogger(); err != nil {
+		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
+	}
+
 	conf := config.InitConfig()
 
-	sugar, err := logger.InitLogger()
+	err := memselect.MemInit(conf)
 	if err != nil {
-		sugar.Fatalw(err.Error(), "Main", "Start logger")
+		logger.Zap.Errorw(err.Error(), "Main", "Initialize storage")
 	}
+	defer memselect.MemStop(conf)
 
-	err = memselect.MemInit(conf)
-	if err != nil {
-		sugar.Errorw(err.Error(), "Main", "Initialize storage")
-	}
-
-	sugar.Infow("Starting server on port: ", conf.ServerPort)
+	logger.Zap.Infof("Starting server on port: %s", conf.ServerPort)
 
 	err = router.Launch(conf)
 	if err != nil {
-		sugar.Fatalw(err.Error(), "Main", "Start server")
+		logger.Zap.Fatalw(err.Error(), "Main", "Start server")
 	}
+
+	defer logger.Zap.Sync()
 }

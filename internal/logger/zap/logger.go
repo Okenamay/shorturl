@@ -7,7 +7,18 @@ import (
 	"go.uber.org/zap"
 )
 
-var sugar *zap.SugaredLogger
+var Zap *zap.SugaredLogger
+
+func InitLogger() error {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return err
+	}
+
+	Zap = logger.Sugar()
+
+	return nil
+}
 
 type (
 	responseData struct {
@@ -50,7 +61,7 @@ func WithLogging(h http.Handler) http.Handler {
 		h.ServeHTTP(&lw, r)
 
 		duration := time.Since(start)
-		sugar.Infoln(
+		Zap.Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
 			"status", responseData.status,
@@ -60,21 +71,4 @@ func WithLogging(h http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(logFn)
-}
-
-func InitLogger() (*zap.SugaredLogger, error) {
-	if sugar != nil {
-		return sugar, nil
-	}
-
-	logger, err := zap.NewProduction()
-	if err != nil {
-		// А можно ошибку передать наверх, в main, и там её обработать?
-		return nil, err
-		// panic(err)
-	}
-	defer logger.Sync()
-
-	sugar = logger.Sugar()
-	return sugar, nil
 }

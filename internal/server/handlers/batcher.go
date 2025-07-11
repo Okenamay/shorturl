@@ -12,38 +12,30 @@ import (
 type RequestEntry = memselect.RequestEntry
 type ResponseEntry = memselect.ResponseEntry
 
-func BatchHandler(conf *config.Cfg) http.HandlerFunc {
+func BatchHandlerTransaction(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sugar, _ := logger.InitLogger()
-		sugar.Info("BatchHandler. Start")
+		logger.Zap.Info("BatchHandlerTransaction. Start")
 
 		var requestBatch []RequestEntry
-		err := json.NewDecoder(r.Body).Decode(&requestBatch)
-		if err != nil {
-			sugar.Error("BatchHandler. Invalid request body format")
+		if err := json.NewDecoder(r.Body).Decode(&requestBatch); err != nil {
+			logger.Zap.Errorw("BatchHandlerTransaction. Invalid request body format", "error", err)
 			http.Error(w, "Invalid request body format", http.StatusBadRequest)
 			return
 		}
 
-		// Debug data:
-		sugar.Info(requestBatch)
-		for v := range requestBatch {
-			temp := requestBatch[v]
-			sugar.Infof("В батче запись номер: %d содержит: %s", v, temp)
-		}
-
-		sugar.Infof("Processing batch of %d entries...", len(requestBatch))
-		responseBatch, err := memselect.ProcessBatch(conf, requestBatch)
+		logger.Zap.Infof("Processing transactional batch of %d entries...", len(requestBatch))
+		responseBatch, err := memselect.ProcessBatchTransaction(conf, requestBatch)
 		if err != nil {
-			// If the processing fails, return an internal server error.
-			sugar.Infof("Error processing batch: %v", err)
+			logger.Zap.Errorw("Error processing transactional batch", "error", err)
 			http.Error(w, "Failed to process batch", http.StatusInternalServerError)
 			return
 		}
-		sugar.Info("Batch processed successfully.")
+		logger.Zap.Info("Transactional batch processed successfully.")
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(responseBatch)
+		if err := json.NewEncoder(w).Encode(responseBatch); err != nil {
+			logger.Zap.Errorw("BatchHandlerTransaction. Failed to write response", "error", err)
+		}
 	}
 }
