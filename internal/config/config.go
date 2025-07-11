@@ -7,11 +7,12 @@ import (
 
 // Дефолтные значения до применения флагов:
 const (
-	ShortIDLen        = 10                       // Длина короткого идентификатора
-	IdleTimeout       = 600                      // Таймаут сервера в секундах
-	ServerPort        = ":8080"                  // Адрес и порт сервера
-	ShortIDServerPort = "http://localhost:8080"  // Адрес и порт для коротких ID
-	SaveFile          = "/tmp/short-url-db.json" // Имя файла-хранилища
+	ShortIDLen        = 10                                             // Длина короткого идентификатора
+	IdleTimeout       = 600                                            // Таймаут сервера в секундах
+	ServerPort        = ":8080"                                        // Адрес и порт сервера
+	ShortIDServerPort = "http://localhost:8080"                        // Адрес и порт для коротких ID
+	SaveFile          = "/tmp/short-url-db.json"                       // Имя файла-хранилища
+	PostgreDSN        = "postgresql://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
 )
 
 type Cfg struct {
@@ -20,6 +21,7 @@ type Cfg struct {
 	ServerPort        string
 	ShortIDServerPort string
 	SaveFilePath      string
+	PostgreDSN        string
 }
 
 var config *Cfg
@@ -38,7 +40,9 @@ func parseFlags() {
 	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDServerPort,
 		"Адрес коротких ID в формате host:port/path")
 	flag.StringVar(&config.SaveFilePath, "f", SaveFile,
-		"Адрес коротких ID в формате host:port/path")
+		"Адрес места хранения файла")
+	flag.StringVar(&config.PostgreDSN, "d", PostgreDSN,
+		"DSN подключения к СУБД PostgreSQL")
 	flag.Parse()
 
 	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
@@ -51,6 +55,10 @@ func parseFlags() {
 
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
+	}
+
+	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
+		config.PostgreDSN = postgreDSN
 	}
 }
 
