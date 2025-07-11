@@ -108,7 +108,7 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 		return err
 	}
 	if exists {
-		sugar.Info("AddOne. DB entry '%s' already exists", fullURL)
+		sugar.Infof("AddOne. DB entry '%s' already exists", fullURL)
 		return nil
 	}
 
@@ -117,11 +117,11 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) error {
 		fullURL, shortID)
 	if err != nil {
 		sugar.Errorw("AddOne. Error adding DB entry", "error", err)
-		sugar.Info("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
+		sugar.Infof("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
 		return err
 	}
 
-	sugar.Info("AddOne. DB entry successful: URL '%s', ShortID '%s'", fullURL, shortID)
+	sugar.Infof("AddOne. DB entry successful: URL '%s', ShortID '%s'", fullURL, shortID)
 
 	return nil
 }

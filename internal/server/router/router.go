@@ -19,6 +19,7 @@ func Launch(conf *config.Cfg) error {
 
 	router.Get("/ping", handlers.PingHandler(conf))
 	router.Post("/api/shorten", handlers.JSONHandler(conf))
+	router.Post("/api/shorten/batch", handlers.BatchHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", handlers.ShortenHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
 

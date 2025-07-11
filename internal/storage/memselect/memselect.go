@@ -1,6 +1,7 @@
 package memselect
 
 import (
+	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/database"
@@ -111,4 +112,46 @@ func CheckPair(conf *config.Cfg, queryID string) (string, error) {
 	fullURL := memstorage.URLStore[queryID]
 
 	return fullURL, nil
+}
+
+type RequestEntry struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type ResponseEntry struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
+func ProcessBatch(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
+	sugar, _ := logger.InitLogger()
+	sugar.Info("BatchHandler. Start")
+
+	var responseBatch []ResponseEntry
+
+	for v := range requestBatch {
+		tempCorrelationID := requestBatch[v].CorrelationID
+		sugar.Infof("BatchHandler. tempCorrelationID run %v: %s", v, tempCorrelationID)
+		tempOriginalURL := requestBatch[v].OriginalURL
+		sugar.Infof("BatchHandler. tempOriginalURL run %v: %s", v, tempOriginalURL)
+
+		tempShortURL, tempShortID := urlmaker.ProcessURL(conf, tempOriginalURL)
+		sugar.Infof("BatchHandler. tempShortURL run %v: %s", v, tempShortURL)
+		sugar.Infof("BatchHandler. tempShortID run %v: %s", v, tempShortID)
+
+		responseBatch = append(responseBatch, ResponseEntry{
+			CorrelationID: tempCorrelationID,
+			ShortURL:      tempShortURL,
+		})
+
+		err := StorePair(conf, tempShortID, tempOriginalURL)
+		if err != nil {
+			sugar.Errorw(err.Error(), "BatchHandler", "StorePair from batch")
+			return nil, err
+		}
+	}
+
+	sugar.Info("BatchHandler. Processed batch")
+	return responseBatch, nil
 }
