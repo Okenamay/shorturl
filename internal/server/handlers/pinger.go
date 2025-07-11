@@ -1,12 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
 // PingHandler проверяет соединение с базой данных и отвечает на пинг:
@@ -15,17 +14,19 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 		sugar, _ := logger.InitLogger()
 		sugar.Info("PingHandler. Start")
 
-		DBPool, err := pgxpool.New(context.Background(), conf.PostgreDSN)
-		if err != nil {
-			sugar.Errorw("PingHandler. DB pool error", "error", err)
-			http.Error(w, "Database connection error", http.StatusInternalServerError)
-			return
-		}
-
-		err = DBPool.Ping(context.Background())
+		err, pingOK := memselect.PingDB(conf)
 		if err != nil {
 			sugar.Errorw("PingHandler. DB ping error", "error", err)
 			http.Error(w, "Database connection error", http.StatusInternalServerError)
+			return
+		} else {
+			sugar.Info("PingHandler. DB ping success")
+		}
+		if !pingOK {
+			sugar.Infof("Database DSN: %s. MemMode: %s.",
+				conf.PostgreDSN, conf.MemMode)
+			sugar.Errorw("PingHandler. DB ping failed", "error", err)
+			http.Error(w, "Database not enabled", http.StatusInternalServerError)
 			return
 		}
 

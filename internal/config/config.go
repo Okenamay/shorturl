@@ -3,6 +3,8 @@ package config
 import (
 	"flag"
 	"os"
+
+	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
 // Дефолтные значения до применения флагов:
@@ -22,11 +24,19 @@ type Cfg struct {
 	ShortIDServerPort string
 	SaveFilePath      string
 	PostgreDSN        string
+	MemMode           string
 }
 
 var config *Cfg
+var useFile bool
+var useDSN bool
 
 func parseFlags() {
+	sugar, err := logger.InitLogger()
+	if err != nil {
+		sugar.Errorw(err.Error(), "Main", "Start logger")
+	}
+
 	if config == nil {
 		config = &Cfg{}
 	}
@@ -39,11 +49,17 @@ func parseFlags() {
 		"Адрес запуска сервера в формате host:port или :port")
 	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDServerPort,
 		"Адрес коротких ID в формате host:port/path")
-	flag.StringVar(&config.SaveFilePath, "f", SaveFile,
+	// Сделали дефолтным значением SaveFilePath "" – если флагом или переменной среды
+	// не задали значение, то никуда не будем писать:
+	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
-	flag.StringVar(&config.PostgreDSN, "d", PostgreDSN,
+	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
+	// не задали значение, то DSN будет пустой:
+	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
 	flag.Parse()
+
+	var saveFilePath, postgreDSN string
 
 	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
 		config.ServerPort = servPort
@@ -55,11 +71,29 @@ func parseFlags() {
 
 	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
 		config.SaveFilePath = saveFilePath
+		sugar.Infof("EnvFilePath = %s", saveFilePath)
 	}
 
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
 		config.PostgreDSN = postgreDSN
+		sugar.Infof("EnvDSN = %s", postgreDSN)
 	}
+
+	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
+	// проверять будем по порядку:
+	if config.PostgreDSN != "" {
+		config.MemMode = "postgres"
+	} else if config.SaveFilePath != "" {
+		config.MemMode = "savefile"
+	} else {
+		config.MemMode = "memstore"
+	}
+
+	sugar.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
+		"useDSN: %t. useFile: %t. saveFilePath: %s. "+
+		"postgreDSN: %s.",
+		config.SaveFilePath, config.PostgreDSN, useDSN, useFile,
+		saveFilePath, postgreDSN)
 }
 
 func InitConfig() *Cfg {

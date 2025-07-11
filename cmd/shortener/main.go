@@ -4,7 +4,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/router"
-	"github.com/Okenamay/shorturl.git/internal/storage/savefile"
+	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
 // Main:
@@ -16,19 +16,10 @@ func main() {
 		sugar.Fatalw(err.Error(), "Main", "Start logger")
 	}
 
-	err = savefile.LoadFile(conf)
+	err = memselect.MemInit(conf)
 	if err != nil {
-		sugar.Errorw(err.Error(), "Main", "Load savefile")
+		sugar.Errorw(err.Error(), "Main", "Initialize storage")
 	}
-
-	// if err := database.Init(conf); err != nil {
-	// 	sugar.Fatalw("Failed to initialize database", "error", err)
-	// }
-
-	// if database.DBPool == nil {
-	// 	sugar.Fatal("Database pool is not initialized")
-	// 	return
-	// }
 
 	sugar.Infow("Starting server on port: ", conf.ServerPort)
 
