@@ -64,13 +64,14 @@ func DBReinit(conf *config.Cfg) error {
 	logger.Zap.Info("DBReinit. Start")
 
 	sql := fmt.Sprintf(`
-    CREATE TABLE IF NOT EXISTS urls (
-        id BIGSERIAL PRIMARY KEY,
-        url VARCHAR(1024) UNIQUE,
-        short_id VARCHAR(%d) UNIQUE
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
-    `, conf.ShortIDLen)
+	CREATE TABLE IF NOT EXISTS urls (
+		id BIGSERIAL PRIMARY KEY,
+		user_id VARCHAR(36),
+		url VARCHAR(1024) UNIQUE,
+		short_id VARCHAR(%d) UNIQUE,
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
+	`, conf.ShortIDLen)
 
 	if DBPool == nil {
 		logger.Zap.Error("DBReinit. DB pool not initialized")
@@ -111,7 +112,7 @@ func DBPing() error {
 	return nil
 }
 
-func AddOne(conf *config.Cfg, shortID, fullURL string) (bool, error) {
+func AddOne(conf *config.Cfg, userID, shortID, fullURL string) (bool, error) {
 	logger.Zap.Info("AddOne. Start")
 
 	if DBPool == nil {
@@ -132,24 +133,28 @@ func AddOne(conf *config.Cfg, shortID, fullURL string) (bool, error) {
 	}
 
 	_, errA := DBPool.Exec(context.Background(),
-		"INSERT INTO urls (url, short_id) VALUES ($1, $2)",
-		fullURL, shortID)
+		"INSERT INTO urls (user_id, url, short_id) VALUES ($1, $2, $3)",
+		userID, fullURL, shortID)
 	if errA != nil {
-		logger.Zap.Infof("AddOne. Failed to add entry: URL '%s', ShortID '%s'", fullURL, shortID)
+		logger.Zap.Infof("AddOne. Failed to add entry: user ID: '%s', URL '%s', ShortID '%s'",
+			userID, fullURL, shortID)
 		logger.Zap.Errorw("AddOne. Error adding DB entry", "error", errA)
 		return false, errA
 	}
 
-	logger.Zap.Infof("AddOne. DB entry successful: URL '%s', ShortID '%s'", fullURL, shortID)
+	logger.Zap.Infof("AddOne. DB entry successful: user ID: '%s', URL '%s', ShortID '%s'",
+		userID, fullURL, shortID)
 	return false, nil
 }
 
-func AddOneTransaction(ctx context.Context, tx pgx.Tx, shortID, fullURL string) error {
-	_, err := tx.Exec(ctx, "INSERT INTO urls (url, short_id) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING", fullURL, shortID)
+func AddOneTransaction(ctx context.Context, tx pgx.Tx, userID, shortID, fullURL string) error {
+	_, err := tx.Exec(ctx, "INSERT INTO urls (user_id, url, short_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING",
+		userID, fullURL, shortID)
 	if err != nil {
 		logger.Zap.Errorw("AddOneTransaction. Error adding DB entry", "error", err)
 		return err
 	}
+
 	return nil
 }
 

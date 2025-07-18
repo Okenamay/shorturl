@@ -73,14 +73,14 @@ func PingDB(conf *config.Cfg) (error, bool) {
 	return nil, pingOK
 }
 
-func StorePair(conf *config.Cfg, shortID, fullURL string) (bool, error) {
+func StorePair(conf *config.Cfg, userID, shortID, fullURL string) (bool, error) {
 	logger.Zap.Info("StorePair", "Running")
 
 	_, alreadyExists := memstorage.Store.Get(shortID)
 
 	switch conf.MemMode {
 	case "postgres":
-		dbExists, err := database.AddOne(conf, shortID, fullURL)
+		dbExists, err := database.AddOne(conf, userID, shortID, fullURL)
 		if err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePair", "AddOne to DB")
 			return false, err
@@ -127,7 +127,7 @@ type ResponseEntry struct {
 	ShortURL      string `json:"short_url"`
 }
 
-func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]ResponseEntry, error) {
+func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry, userID string) ([]ResponseEntry, error) {
 	logger.Zap.Info("ProcessBatchTransaction. Start")
 
 	var responseBatch []ResponseEntry
@@ -152,7 +152,7 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 			ShortURL:      shortURL,
 		})
 
-		if err := StorePairTransaction(ctx, tx, conf, shortID, entry.OriginalURL); err != nil {
+		if err := StorePairTransaction(ctx, tx, conf, userID, shortID, entry.OriginalURL); err != nil {
 			logger.Zap.Errorw(err.Error(), "ProcessBatchTransaction", "StorePairTransaction from batch")
 			return nil, err
 		}
@@ -176,25 +176,18 @@ func ProcessBatchTransaction(conf *config.Cfg, requestBatch []RequestEntry) ([]R
 	return responseBatch, nil
 }
 
-func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, shortID, fullURL string) error {
+func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, userID, shortID, fullURL string) error {
 	logger.Zap.Info("StorePairTransaction. Start")
 
 	memstorage.Store.Set(shortID, fullURL)
 
-	var err error
-	switch conf.MemMode {
-	case "postgres":
-		err = database.AddOneTransaction(ctx, tx, shortID, fullURL)
-		if err != nil {
+	if conf.MemMode == "postgres" {
+		// Pass the userID to the database layer.
+		if err := database.AddOneTransaction(ctx, tx, userID, shortID, fullURL); err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePairTransaction", "AddOneTransaction to DB")
 			return err
 		}
-	case "savefile":
-	case "memstore":
-	default:
-		logger.Zap.Info("StorePairTransaction", "Wrong MemMode")
 	}
-
 	return nil
 }
 

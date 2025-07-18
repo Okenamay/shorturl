@@ -38,9 +38,6 @@ type Cfg struct {
 	AuthorizationKey  string
 }
 
-var useFile bool
-var useDSN bool
-
 func parseFlags() *Cfg {
 	config := &Cfg{}
 
@@ -52,12 +49,8 @@ func parseFlags() *Cfg {
 		"Адрес запуска сервера в формате host:port или :port")
 	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDAddr,
 		"Адрес коротких ID в формате host:port/path")
-	// Сделали дефолтным значением SaveFilePath "" – если флагом или переменной среды
-	// не задали значение, то никуда не будем писать:
 	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
-	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
-	// не задали значение, то DSN будет пустой:
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
 	flag.BoolVar(&config.LogVerbose, "log", Verbose,
@@ -93,12 +86,7 @@ func parseFlags() *Cfg {
 	}
 
 	if logVerbose, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
-		switch logVerbose {
-		case "true":
-			config.LogVerbose = true
-		default:
-			config.LogVerbose = false
-		}
+		config.LogVerbose = (logVerbose == "true")
 		logger.Zap.Infof("EnvVerbose = %s", logVerbose)
 	}
 
@@ -112,13 +100,8 @@ func parseFlags() *Cfg {
 		logger.Zap.Infof("EnvMigrDir = %s", migrateDirection)
 	}
 
-	if dbReinitialize, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
-		switch dbReinitialize {
-		case "true":
-			config.DBReinitialize = true
-		default:
-			config.DBReinitialize = false
-		}
+	if dbReinitialize, ok := os.LookupEnv("DB_REINIT"); ok {
+		config.DBReinitialize = (dbReinitialize == "true")
 		logger.Zap.Infof("EnvVerbose = %s", dbReinitialize)
 	}
 
@@ -136,6 +119,9 @@ func parseFlags() *Cfg {
 	} else {
 		config.MemMode = "memstore"
 	}
+
+	var useFile bool
+	var useDSN bool
 
 	logger.Zap.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
 		"useDSN: %t. useFile: %t. saveFilePath: %s. "+
