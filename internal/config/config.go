@@ -68,7 +68,7 @@ func parseFlags() *Cfg {
 		"Направление миграции БД (up = миграция, down = роллбек)")
 	flag.BoolVar(&config.DBReinitialize, "dbx", DBReinit,
 		"Реинициализация БД (bool)")
-	flag.StringVar(&config.AuthorizationKey, "s", AuthKey,
+	flag.StringVar(&config.AuthorizationKey, "k", AuthKey,
 		"Ключ для генерации JWT-токена")
 	flag.Parse()
 

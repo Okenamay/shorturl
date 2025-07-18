@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	DBPool      *pgxpool.Pool
-	EntryExists bool
-	err         error
+	DBPool *pgxpool.Pool
+	err    error
 )
 
 func StartDB(conf *config.Cfg) error {
