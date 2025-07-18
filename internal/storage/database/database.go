@@ -68,7 +68,7 @@ func DBReinit(conf *config.Cfg) error {
 		id BIGSERIAL PRIMARY KEY,
 		user_id VARCHAR(36),
 		url VARCHAR(1024) UNIQUE,
-		short_id VARCHAR(%d) UNIQUE,
+		short_id VARCHAR(%d) UNIQUE
 	);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
 	`, conf.ShortIDLen)
