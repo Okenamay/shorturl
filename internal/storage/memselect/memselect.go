@@ -195,5 +195,5 @@ func GetUserURLs(conf *config.Cfg, userID string) ([]database.UserURL, error) {
 	if conf.MemMode != "postgres" {
 		return nil, nil
 	}
-	return database.GetUserURLs(userID)
+	return database.GetUserURLs(conf, userID)
 }

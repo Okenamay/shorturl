@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
@@ -158,7 +159,7 @@ func AddOneTransaction(ctx context.Context, tx pgx.Tx, userID, shortID, fullURL 
 	return nil
 }
 
-func GetUserURLs(userID string) ([]UserURL, error) {
+func GetUserURLs(conf *config.Cfg, userID string) ([]UserURL, error) {
 	rows, err := DBPool.Query(context.Background(), "SELECT short_id, url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		logger.Zap.Errorw("GetUserURLs. Query failed", "error", err)
@@ -167,12 +168,17 @@ func GetUserURLs(userID string) ([]UserURL, error) {
 	defer rows.Close()
 
 	var userURLs []UserURL
+	var shortID string
 	for rows.Next() {
 		var u UserURL
-		if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
+		// if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
+		if err := rows.Scan(&shortID, &u.OriginalURL); err != nil {
 			logger.Zap.Errorw("GetUserURLs. Row scan failed", "error", err)
 			return nil, err
 		}
+
+		u.ShortURL = urlmaker.MakeFullURL(conf, shortID)
+		// u.ShortURL = urlmaker.MakeFullURL(conf, u.ShortURL)
 		userURLs = append(userURLs, u)
 	}
 
