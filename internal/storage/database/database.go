@@ -169,16 +169,16 @@ func GetUserURLs(conf *config.Cfg, userID string) ([]UserURL, error) {
 
 	var userURLs []UserURL
 	var shortID string
+
 	for rows.Next() {
 		var u UserURL
-		// if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
 		if err := rows.Scan(&shortID, &u.OriginalURL); err != nil {
 			logger.Zap.Errorw("GetUserURLs. Row scan failed", "error", err)
 			return nil, err
 		}
 
 		u.ShortURL = urlmaker.MakeFullURL(conf, shortID)
-		// u.ShortURL = urlmaker.MakeFullURL(conf, u.ShortURL)
+
 		userURLs = append(userURLs, u)
 	}
 

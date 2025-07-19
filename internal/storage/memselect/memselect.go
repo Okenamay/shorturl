@@ -182,7 +182,6 @@ func StorePairTransaction(ctx context.Context, tx pgx.Tx, conf *config.Cfg, user
 	memstorage.Store.Set(shortID, fullURL)
 
 	if conf.MemMode == "postgres" {
-		// Pass the userID to the database layer.
 		if err := database.AddOneTransaction(ctx, tx, userID, shortID, fullURL); err != nil {
 			logger.Zap.Errorw(err.Error(), "StorePairTransaction", "AddOneTransaction to DB")
 			return err

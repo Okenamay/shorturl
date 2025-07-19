@@ -17,12 +17,11 @@ func Launch(conf *config.Cfg) error {
 	router := chi.NewRouter()
 
 	router.Use(logger.WithLogging)
-	router.Use(auth.Authenticator)
+	router.Use(auth.Authenticator(conf))
 
 	router.Get("/ping", handlers.PingHandler(conf))
 	router.Post("/api/shorten", handlers.JSONHandler(conf))
 	router.Post("/api/shorten/batch", handlers.BatchHandlerTransaction(conf))
-	router.Post("/api/user/urls", handlers.ShortenHandler(conf))
 	router.Get("/api/user/urls", handlers.UserURLsHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", handlers.ShortenHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
