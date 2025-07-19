@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
@@ -237,4 +239,34 @@ func TestShortenHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUserURLsHandler(t *testing.T) {
+	router := chi.NewRouter()
+	router.Get("/api/user/urls", UserURLsHandler(Conf))
+
+	t.Run("UserURLsHandler_Unauthorized", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, request)
+
+		result := w.Result()
+		defer result.Body.Close()
+
+		require.Equal(t, http.StatusUnauthorized, result.StatusCode)
+	})
+
+	t.Run("UserURLsHandler_No_Content", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		ctx := context.WithValue(request.Context(), auth.UserIDContextKey, "test-user-id")
+		request = request.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, request)
+
+		result := w.Result()
+		defer result.Body.Close()
+
+		require.Equal(t, http.StatusNoContent, result.StatusCode)
+	})
 }

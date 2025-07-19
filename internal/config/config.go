@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 	"sync"
 
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
@@ -21,6 +22,7 @@ const (
 	MigrDir     = ""                                             // Заглушка
 	DBReinit    = true                                           // Флаг переинициализации БД при старте
 	AuthKey     = "secret_key"                                   // Ключ авторизации.
+	TokenExp    = 24                                             // Срок истечения действия токена.
 )
 
 type Cfg struct {
@@ -36,6 +38,7 @@ type Cfg struct {
 	MigrateDirection  string
 	DBReinitialize    bool
 	AuthorizationKey  string
+	TokenExpiry       int
 }
 
 func parseFlags() *Cfg {
@@ -63,6 +66,8 @@ func parseFlags() *Cfg {
 		"Реинициализация БД (bool)")
 	flag.StringVar(&config.AuthorizationKey, "k", AuthKey,
 		"Ключ для генерации JWT-токена")
+	flag.IntVar(&config.TokenExpiry, "txp", TokenExp,
+		"Срок истечения токена, часов")
 	flag.Parse()
 
 	var saveFilePath, postgreDSN string
@@ -108,6 +113,16 @@ func parseFlags() *Cfg {
 	if authorizationKey, ok := os.LookupEnv("AUTH_SECRET_KEY"); ok && authorizationKey != "" {
 		config.AuthorizationKey = authorizationKey
 		logger.Zap.Infof("EnvKey = %s", authorizationKey)
+	}
+
+	if tokenExpiryStr, ok := os.LookupEnv("TOKEN_EXPIRY"); ok && tokenExpiryStr != "" {
+		tokenExpiry, err := strconv.Atoi(tokenExpiryStr)
+		if err == nil {
+			config.TokenExpiry = tokenExpiry
+			logger.Zap.Infof("EnvExpiry = %s", tokenExpiryStr)
+		} else {
+			logger.Zap.Errorf("Could not process TOKEN_EXPIRY: %v", err)
+		}
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,

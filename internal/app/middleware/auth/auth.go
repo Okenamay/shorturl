@@ -15,13 +15,12 @@ type claims struct {
 	UserID string
 }
 
-const TokenExp = time.Hour * 24
-const SecretKey = "supersecretkey"
-
 func buildJWTString(conf *config.Cfg, userID string) (string, error) {
+	tokenExp := time.Duration(conf.TokenExpiry) * time.Hour
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExp)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenExp)),
 		},
 		UserID: userID,
 	})
@@ -61,6 +60,8 @@ const UserIDContextKey = contextKey("userID")
 func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tokenExp := time.Duration(conf.TokenExpiry) * time.Hour
+
 			cookie, err := r.Cookie("token")
 			if err != nil {
 				newUserID := uuid.New().String()
@@ -74,7 +75,7 @@ func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 					Name:    "token",
 					Value:   tokenString,
 					Path:    "/",
-					Expires: time.Now().Add(TokenExp),
+					Expires: time.Now().Add(tokenExp),
 				})
 
 				ctx := context.WithValue(r.Context(), UserIDContextKey, newUserID)
