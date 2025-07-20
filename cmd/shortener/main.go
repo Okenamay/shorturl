@@ -18,7 +18,6 @@ func main() {
 	conf := config.InitConfig()
 
 	memselect.DeleteChan = make(chan memselect.DeleteTask, 1024)
-
 	runDeletionWorker(memselect.DeleteChan)
 
 	err := memselect.MemInit(conf)
@@ -38,31 +37,47 @@ func main() {
 }
 
 func runDeletionWorker(deleteChan <-chan memselect.DeleteTask) {
-	ticker := time.NewTicker(10 * time.Second)
-
 	var deleteBuffer []memselect.DeleteTask
 
+	flushBuffer := func() {
+		if len(deleteBuffer) == 0 {
+			return
+		}
+
+		logger.Zap.Infof("Flushing %d deletion tasks from buffer", len(deleteBuffer))
+
+		tasksByUser := make(map[string][]string)
+		for _, task := range deleteBuffer {
+			tasksByUser[task.UserID] = append(tasksByUser[task.UserID], task.ShortIDs...)
+		}
+
+		for userID, shortIDs := range tasksByUser {
+			err := memselect.BatchDelete(context.Background(), userID, shortIDs)
+			if err != nil {
+				logger.Zap.Errorw("Deletion worker failed to batch delete", "error", err, "userID", userID)
+			}
+		}
+
+		deleteBuffer = nil
+	}
+
 	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
 			case task := <-deleteChan:
 				deleteBuffer = append(deleteBuffer, task)
-			case <-ticker.C:
-				if len(deleteBuffer) > 0 {
-					tasksByUser := make(map[string][]string)
-					for _, task := range deleteBuffer {
-						tasksByUser[task.UserID] = append(tasksByUser[task.UserID], task.ShortIDs...)
-					}
-
-					for userID, shortIDs := range tasksByUser {
-						err := memselect.BatchDelete(context.Background(), userID, shortIDs)
-						if err != nil {
-							logger.Zap.Errorw("Deletion worker failed to batch delete", "error", err)
-						}
-					}
-
-					deleteBuffer = nil
+				if len(deleteBuffer) >= 25 {
+					logger.Zap.Info("Deletion buffer reached size threshold, flushing...")
+					flushBuffer()
+					// Reset the timer to prevent an immediate second flush.
+					ticker.Reset(2 * time.Second)
 				}
+			case <-ticker.C:
+				logger.Zap.Info("Deletion ticker fired, flushing buffer...")
+				flushBuffer()
 			}
 		}
 	}()
