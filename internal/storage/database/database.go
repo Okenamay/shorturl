@@ -13,6 +13,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func DeleteFlaggedURLs(ctx context.Context) error {
+	logger.Zap.Info("Running scheduled deletion of flagged URLs")
+	if DBPool == nil {
+		return fmt.Errorf("database pool is not initialized")
+	}
+
+	res, err := DBPool.Exec(ctx, "DELETE FROM urls WHERE del_flag = true")
+	if err != nil {
+		logger.Zap.Errorw("Failed to delete flagged URLs", "error", err)
+		return err
+	}
+
+	rowsAffected := res.RowsAffected()
+	if rowsAffected > 0 {
+		logger.Zap.Infof("Successfully deleted %d flagged URLs", rowsAffected)
+	} else {
+		logger.Zap.Info("No flagged URLs to delete")
+	}
+
+	return nil
+}
+
 var (
 	DBPool *pgxpool.Pool
 	err    error

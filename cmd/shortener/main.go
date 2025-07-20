@@ -7,6 +7,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/router"
+	"github.com/Okenamay/shorturl.git/internal/storage/database"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 )
 
@@ -19,6 +20,8 @@ func main() {
 
 	memselect.DeleteChan = make(chan memselect.DeleteTask, 1024)
 	runDeletionWorker(memselect.DeleteChan)
+
+	runHardDeleter()
 
 	err := memselect.MemInit(conf)
 	if err != nil {
@@ -78,6 +81,24 @@ func runDeletionWorker(deleteChan <-chan memselect.DeleteTask) {
 			case <-ticker.C:
 				logger.Zap.Info("Deletion ticker fired, flushing buffer...")
 				flushBuffer()
+			}
+		}
+	}()
+}
+
+func runHardDeleter() {
+	go func() {
+		// Create a ticker that fires every 20 seconds.
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			ctx := context.Background()
+
+			err := database.DeleteFlaggedURLs(ctx)
+			if err != nil {
+
+				logger.Zap.Errorw("Hard delete worker failed", "error", err)
 			}
 		}
 	}()
