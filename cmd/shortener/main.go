@@ -75,7 +75,7 @@ func runDeletionWorker(deleteChan <-chan memselect.DeleteTask) {
 				if len(deleteBuffer) >= 25 {
 					logger.Zap.Info("Deletion buffer reached size threshold, flushing...")
 					flushBuffer()
-					// Reset the timer to prevent an immediate second flush.
+
 					ticker.Reset(2 * time.Second)
 				}
 			case <-ticker.C:
@@ -88,7 +88,6 @@ func runDeletionWorker(deleteChan <-chan memselect.DeleteTask) {
 
 func runHardDeleter() {
 	go func() {
-		// Create a ticker that fires every 20 seconds.
 		ticker := time.NewTicker(20 * time.Second)
 		defer ticker.Stop()
 
