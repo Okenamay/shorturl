@@ -104,13 +104,17 @@ func BatchDelete(ctx context.Context, userID string, shortIDs []string) error {
 	}
 
 	results := tx.SendBatch(ctx, batch)
-	defer results.Close()
 
 	for range shortIDs {
 		_, err := results.Exec()
 		if err != nil {
 			logger.Zap.Errorw("BatchDelete. Error in batch execution", "error", err)
 		}
+	}
+
+	if closeErr := results.Close(); closeErr != nil {
+		logger.Zap.Errorw("BatchDelete. Error closing batch results", "error", closeErr)
+		return closeErr
 	}
 
 	return tx.Commit(ctx)
