@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
@@ -96,7 +97,10 @@ func BatchDelete(ctx context.Context, userID string, shortIDs []string) error {
 func StartDB(conf *config.Cfg) error {
 	logger.Zap.Info("StartDB. Start")
 
-	DBPool, err = pgxpool.New(context.Background(), conf.PostgreDSN)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	DBPool, err = pgxpool.New(ctx, conf.PostgreDSN)
 	if err != nil {
 		logger.Zap.Errorw("StartDB. Failed to connect pgxpool", "error", err)
 		return err
