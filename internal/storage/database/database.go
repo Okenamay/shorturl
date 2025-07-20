@@ -17,6 +17,82 @@ var (
 	err    error
 )
 
+type URLInfo struct {
+	OriginalURL string
+	IsDeleted   bool
+}
+
+func DBReinit(conf *config.Cfg) error {
+	logger.Zap.Info("DBReinit. Start")
+
+	sql := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS urls (
+		id BIGSERIAL PRIMARY KEY,
+		user_id VARCHAR(36),
+		url VARCHAR(1024) UNIQUE,
+		short_id VARCHAR(%d) UNIQUE,
+		del_flag BOOLEAN DEFAULT false
+	);
+	`, conf.ShortIDLen)
+
+	if DBPool == nil {
+		logger.Zap.Error("DBReinit. DB pool not initialized")
+		return fmt.Errorf("DBReinit. DB pool is not initialized")
+	}
+
+	_, err := DBPool.Exec(context.Background(), sql)
+	if err != nil {
+		logger.Zap.Errorf("DBReinit. Failed to create table: %w", err)
+		return err
+	}
+
+	logger.Zap.Info("DBReinit. Table created or already exists")
+	return nil
+}
+
+func GetURLInfo(shortID string) (URLInfo, error) {
+	var info URLInfo
+	err := DBPool.QueryRow(context.Background(),
+		"SELECT url, del_flag FROM urls WHERE short_id = $1", shortID).Scan(&info.OriginalURL, &info.IsDeleted)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return URLInfo{}, nil
+		}
+		return URLInfo{}, err
+	}
+	return info, nil
+}
+
+func BatchDelete(ctx context.Context, userID string, shortIDs []string) error {
+	tx, err := DBPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Prepare(ctx, "batch_delete", "UPDATE urls SET del_flag = true WHERE user_id = $1 AND short_id = $2")
+	if err != nil {
+		return err
+	}
+
+	batch := &pgx.Batch{}
+	for _, shortID := range shortIDs {
+		batch.Queue("batch_delete", userID, shortID)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+	defer results.Close()
+
+	for range shortIDs {
+		_, err := results.Exec()
+		if err != nil {
+			logger.Zap.Errorw("BatchDelete. Error in batch execution", "error", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func StartDB(conf *config.Cfg) error {
 	logger.Zap.Info("StartDB. Start")
 
@@ -58,34 +134,6 @@ func StartDB(conf *config.Cfg) error {
 
 	logger.Zap.Infof("StartDB. Loaded %d records into memory", len(memstorage.Store.GetAll()))
 
-	return nil
-}
-
-func DBReinit(conf *config.Cfg) error {
-	logger.Zap.Info("DBReinit. Start")
-
-	sql := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS urls (
-		id BIGSERIAL PRIMARY KEY,
-		user_id VARCHAR(36),
-		url VARCHAR(1024) UNIQUE,
-		short_id VARCHAR(%d) UNIQUE
-	);
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON urls (url, short_id);
-	`, conf.ShortIDLen)
-
-	if DBPool == nil {
-		logger.Zap.Error("DBReinit. DB pool not initialized")
-		return fmt.Errorf("DBReinit. DB pool is not initialized")
-	}
-
-	_, err := DBPool.Exec(context.Background(), sql)
-	if err != nil {
-		logger.Zap.Errorf("DBReinit. Failed to create table: %w", err)
-		return err
-	}
-
-	logger.Zap.Info("DBReinit. Table created or already exists")
 	return nil
 }
 
@@ -160,7 +208,7 @@ func AddOneTransaction(ctx context.Context, tx pgx.Tx, userID, shortID, fullURL 
 }
 
 func GetUserURLs(conf *config.Cfg, userID string) ([]UserURL, error) {
-	rows, err := DBPool.Query(context.Background(), "SELECT short_id, url FROM urls WHERE user_id = $1", userID)
+	rows, err := DBPool.Query(context.Background(), "SELECT short_id, url FROM urls WHERE user_id = $1 AND del_flag = false", userID)
 	if err != nil {
 		logger.Zap.Errorw("GetUserURLs. Query failed", "error", err)
 		return nil, err

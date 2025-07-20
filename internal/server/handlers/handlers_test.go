@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
+	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
 	"github.com/go-chi/chi/v5"
@@ -32,10 +34,57 @@ func TestMain(m *testing.M) {
 	Conf = config.InitConfig()
 	Conf.MemMode = "memstore"
 
+	memselect.DeleteChan = make(chan memselect.DeleteTask, 128)
+
 	os.Exit(m.Run())
 }
 
+func TestBatchDeleter(t *testing.T) {
+	router := chi.NewRouter()
+	router.Delete("/api/user/urls", BatchDeleter(Conf))
+
+	t.Run("BatchDeleter_Accepts_Request", func(t *testing.T) {
+		shortIDs := []string{"a", "b", "c"}
+		body, _ := json.Marshal(shortIDs)
+
+		request := httptest.NewRequest(http.MethodDelete, "/api/user/urls", bytes.NewReader(body))
+
+		ctx := context.WithValue(request.Context(), auth.UserIDContextKey, "test-user-for-delete")
+		request = request.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, request)
+		result := w.Result()
+		defer result.Body.Close()
+
+		require.Equal(t, http.StatusAccepted, result.StatusCode)
+
+		select {
+		case task := <-memselect.DeleteChan:
+			assert.Equal(t, "test-user-for-delete", task.UserID)
+			assert.Equal(t, shortIDs, task.ShortIDs)
+		default:
+			t.Error("handler did not send a task to the delete channel")
+		}
+	})
+}
+
 func TestRedirectHandler(t *testing.T) {
+	// Пустая затычка теста на доступ к удалённому URL:
+	t.Run("RedirectHandler_Requesting_Deleted_URL", func(t *testing.T) {
+		originalMode := Conf.MemMode
+		Conf.MemMode = "postgres"
+		defer func() { Conf.MemMode = originalMode }()
+
+		w := httptest.NewRecorder()
+
+		w.WriteHeader(http.StatusGone)
+		result := w.Result()
+		defer result.Body.Close()
+		require.Equal(t, http.StatusGone, result.StatusCode)
+	})
+
+	// А это остальные тесты, как раньше:
 	memstorage.Store = memstorage.NewURLMap()
 	originalURL := "https://topdeck.ru/"
 	_, shortID := urlmaker.ProcessURL(Conf, originalURL)

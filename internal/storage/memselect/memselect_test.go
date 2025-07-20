@@ -34,9 +34,10 @@ func TestStoreAndCheckPair(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, exists)
 
-	retrievedURL, err := CheckPair(Conf, shortID)
+	retrievedInfo, err := CheckPair(Conf, shortID)
 	require.NoError(t, err)
-	assert.Equal(t, fullURL, retrievedURL)
+	assert.Equal(t, fullURL, retrievedInfo.OriginalURL)
+	assert.False(t, retrievedInfo.IsDeleted)
 }
 
 func TestProcessBatchTransaction(t *testing.T) {
@@ -57,4 +58,12 @@ func TestProcessBatchTransaction(t *testing.T) {
 
 	allStored := memstorage.Store.GetAll()
 	assert.Len(t, allStored, 2)
+}
+
+func TestGetUserURLs(t *testing.T) {
+	t.Run("GetUserURLs_memstore_returns_nil", func(t *testing.T) {
+		urls, err := GetUserURLs(Conf, "any-user-id")
+		require.NoError(t, err)
+		assert.Nil(t, urls)
+	})
 }

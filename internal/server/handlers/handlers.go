@@ -64,20 +64,26 @@ func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		fullURL, err := memselect.CheckPair(conf, queryID)
+		urlInfo, err := memselect.CheckPair(conf, queryID)
 		if err != nil {
 			logger.Zap.Errorw("RedirectHandler. Failed to check URL/ShortID pair", "error", err)
+			http.Error(w, "Server error", http.StatusInternalServerError)
 			return
 		}
 
-		if fullURL == "" {
+		if urlInfo.OriginalURL == "" {
 			logger.Zap.Errorw("RedirectHandler. Failed to find URL/ShortID pair", "error", err)
 			http.Error(w, emsg.ErrorNotInDB.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		if urlInfo.IsDeleted {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
+
 		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Location", fullURL)
+		w.Header().Set("Location", urlInfo.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 }
@@ -105,5 +111,36 @@ func UserURLsHandler(conf *config.Cfg) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(urls)
+	}
+}
+
+// Удалим URLы юзера по списку из запроса:
+func BatchDeleter(conf *config.Cfg) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := r.Context().Value(auth.UserIDContextKey).(string)
+		if !ok || userID == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var shortIDs []string
+		if err := json.NewDecoder(r.Body).Decode(&shortIDs); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if len(shortIDs) == 0 {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+
+		task := memselect.DeleteTask{
+			UserID:   userID,
+			ShortIDs: shortIDs,
+		}
+
+		memselect.DeleteChan <- task
+
+		w.WriteHeader(http.StatusAccepted)
 	}
 }
