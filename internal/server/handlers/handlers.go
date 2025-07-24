@@ -134,7 +134,7 @@ func BatchDeleter(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		go memselect.SendToDelete(userID, shortIDs)
+		memselect.SendToDelete(userID, shortIDs)
 
 		w.WriteHeader(http.StatusAccepted)
 	}
