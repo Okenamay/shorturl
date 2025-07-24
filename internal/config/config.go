@@ -9,6 +9,20 @@ import (
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
+// --- NEW: DeleteTask and DeleteChan definitions ---
+// These have been moved from the memselect package to centralize
+// core application types and variables.
+
+// DeleteTask holds the information for a deletion job.
+type DeleteTask struct {
+	UserID   string
+	ShortIDs []string
+}
+
+// DeleteChan is the channel that the handler will use to send tasks to the worker.
+// It is defined here but initialized in main.go.
+var DeleteChan chan DeleteTask
+
 // Дефолтные значения до применения флагов:
 const (
 	ShortIDLen  = 10                                             // Длина короткого идентификатора

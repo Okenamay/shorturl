@@ -91,8 +91,8 @@ func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 // Выдадим авторизованным пользователям их URL:
 func UserURLsHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(auth.UserIDContextKey).(string)
-		if !ok || userID == "" {
+		userID, authorized := auth.CheckAuth(r)
+		if !authorized {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -117,8 +117,8 @@ func UserURLsHandler(conf *config.Cfg) http.HandlerFunc {
 // Удалим URLы юзера по списку из запроса:
 func BatchDeleter(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(auth.UserIDContextKey).(string)
-		if !ok || userID == "" {
+		userID, authorized := auth.CheckAuth(r)
+		if !authorized {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

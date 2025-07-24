@@ -95,3 +95,11 @@ func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+func CheckAuth(r *http.Request) (string, bool) {
+	userID, ok := r.Context().Value(UserIDContextKey).(string)
+	if !ok || userID == "" {
+		return "", false
+	}
+	return userID, true
+}
