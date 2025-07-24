@@ -12,6 +12,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
+	"github.com/Okenamay/shorturl.git/internal/worker"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -134,7 +135,11 @@ func BatchDeleter(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		memselect.SendToDelete(userID, shortIDs)
+		task := worker.DeleteTask{
+			UserID:   userID,
+			ShortIDs: shortIDs,
+		}
+		worker.DeleteChan <- task
 
 		w.WriteHeader(http.StatusAccepted)
 	}

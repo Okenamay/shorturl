@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
@@ -17,6 +18,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	"github.com/Okenamay/shorturl.git/internal/worker"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +35,7 @@ func TestMain(m *testing.M) {
 	Conf = config.InitConfig()
 	Conf.MemMode = "memstore"
 
-	config.DeleteChan = make(chan config.DeleteTask, 128)
+	worker.DeleteChan = make(chan worker.DeleteTask, 128)
 
 	os.Exit(m.Run())
 }
@@ -59,11 +61,11 @@ func TestBatchDeleter(t *testing.T) {
 		require.Equal(t, http.StatusAccepted, result.StatusCode)
 
 		select {
-		case task := <-config.DeleteChan:
+		case task := <-worker.DeleteChan:
 			assert.Equal(t, "test-user-for-delete", task.UserID)
 			assert.Equal(t, shortIDs, task.ShortIDs)
-		default:
-			t.Error("handler did not send a task to the delete channel")
+		case <-time.After(100 * time.Millisecond):
+			t.Error("handler did not send a task to the delete channel in time")
 		}
 	})
 }

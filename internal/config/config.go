@@ -9,13 +9,6 @@ import (
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
-type DeleteTask struct {
-	UserID   string
-	ShortIDs []string
-}
-
-var DeleteChan chan DeleteTask
-
 // Дефолтные значения до применения флагов:
 const (
 	ShortIDLen  = 10                                             // Длина короткого идентификатора
