@@ -85,3 +85,11 @@ func Start(batchDeleter BatchDeleteFunc) {
 	softDeleter(DeleteChan, batchDeleter)
 	hardDeleter()
 }
+
+func SendToDelete(userID string, shortIDs []string) {
+	task := DeleteTask{
+		UserID:   userID,
+		ShortIDs: shortIDs,
+	}
+	DeleteChan <- task
+}
