@@ -12,12 +12,13 @@ import (
 	pgx "github.com/jackc/pgx/v5"
 )
 
-type DeleteTask struct {
-	UserID   string
-	ShortIDs []string
+func SendToDelete(userID string, shortIDs []string) {
+	task := config.DeleteTask{
+		UserID:   userID,
+		ShortIDs: shortIDs,
+	}
+	config.DeleteChan <- task
 }
-
-var DeleteChan chan DeleteTask
 
 func MemInit(conf *config.Cfg) error {
 	logger.Zap.Info("MemInit", "Assessing memory mode")

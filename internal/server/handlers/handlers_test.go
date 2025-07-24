@@ -16,7 +16,6 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 
 	"github.com/go-chi/chi/v5"
@@ -34,7 +33,7 @@ func TestMain(m *testing.M) {
 	Conf = config.InitConfig()
 	Conf.MemMode = "memstore"
 
-	memselect.DeleteChan = make(chan memselect.DeleteTask, 128)
+	config.DeleteChan = make(chan config.DeleteTask, 128)
 
 	os.Exit(m.Run())
 }
@@ -60,7 +59,7 @@ func TestBatchDeleter(t *testing.T) {
 		require.Equal(t, http.StatusAccepted, result.StatusCode)
 
 		select {
-		case task := <-memselect.DeleteChan:
+		case task := <-config.DeleteChan:
 			assert.Equal(t, "test-user-for-delete", task.UserID)
 			assert.Equal(t, shortIDs, task.ShortIDs)
 		default:

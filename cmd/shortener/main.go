@@ -18,8 +18,8 @@ func main() {
 
 	conf := config.InitConfig()
 
-	memselect.DeleteChan = make(chan memselect.DeleteTask, 1024)
-	runDeletionWorker(memselect.DeleteChan)
+	config.DeleteChan = make(chan config.DeleteTask, 1024)
+	runDeletionWorker(config.DeleteChan)
 
 	runHardDeleter()
 
@@ -39,8 +39,8 @@ func main() {
 	defer logger.Zap.Sync()
 }
 
-func runDeletionWorker(deleteChan <-chan memselect.DeleteTask) {
-	var deleteBuffer []memselect.DeleteTask
+func runDeletionWorker(deleteChan <-chan config.DeleteTask) {
+	var deleteBuffer []config.DeleteTask
 
 	flushBuffer := func() {
 		if len(deleteBuffer) == 0 {
@@ -96,7 +96,6 @@ func runHardDeleter() {
 
 			err := database.DeleteFlaggedURLs(ctx)
 			if err != nil {
-
 				logger.Zap.Errorw("Hard delete worker failed", "error", err)
 			}
 		}
