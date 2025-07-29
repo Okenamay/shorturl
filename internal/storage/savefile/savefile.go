@@ -15,6 +15,7 @@ import (
 
 type record struct {
 	UUID        string `json:"uuid"`
+	UserID      string `json:"user_id,omitempty"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }

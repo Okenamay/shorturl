@@ -18,6 +18,7 @@ import (
 // Обработка запросов на сокращение URL:
 func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		queryBody, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -33,10 +34,9 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		fullURL := CheckedURL.String()
-
 		newURL, shortID := urlmaker.ProcessURL(conf, fullURL)
 
-		exists, err := memselect.StorePair(conf, shortID, fullURL)
+		exists, err := memselect.StorePair(conf, userID, shortID, fullURL)
 		if err != nil {
 			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
 			return

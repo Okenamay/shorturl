@@ -9,6 +9,20 @@ type MigrationEntry struct {
 }
 
 var migrations = map[string]MigrationEntry{
+	"20250718110100": {
+		ID: "20250718110100",
+		UpSQL: `
+            CREATE TABLE IF NOT EXISTS public.urls (
+                id BIGSERIAL PRIMARY KEY,
+                user_id VARCHAR(36),
+                url VARCHAR(1024) NOT NULL UNIQUE,
+                short_id VARCHAR(10) NOT NULL UNIQUE
+            );
+        `,
+		DownSQL: `
+            DROP TABLE IF EXISTS public.urls;
+        `,
+	},
 	"20250520160000": {
 		ID: "20250520160000",
 		UpSQL: `

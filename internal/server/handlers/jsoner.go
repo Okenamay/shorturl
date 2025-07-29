@@ -7,6 +7,7 @@ import (
 
 	"github.com/Okenamay/shorturl.git/internal/app/checker"
 	emsg "github.com/Okenamay/shorturl.git/internal/app/errmsg"
+	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
@@ -25,6 +26,8 @@ type JSONResponse struct {
 func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger.Zap.Info("JSONHandler. Start")
+
+		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		var request JSONRequest
 		var buf bytes.Buffer
@@ -51,7 +54,7 @@ func JSONHandler(conf *config.Cfg) http.HandlerFunc {
 		fullURL := CheckedURL.String()
 		newURL, shortID := urlmaker.ProcessURL(conf, fullURL)
 
-		exists, err := memselect.StorePair(conf, shortID, fullURL)
+		exists, err := memselect.StorePair(conf, userID, shortID, fullURL)
 		if err != nil {
 			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
 			return

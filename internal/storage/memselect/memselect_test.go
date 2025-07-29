@@ -26,10 +26,11 @@ func TestMain(m *testing.M) {
 func TestStoreAndCheckPair(t *testing.T) {
 	memstorage.Store = memstorage.NewURLMap()
 
+	userID := "test-user-123"
 	shortID := "abcdef123"
 	fullURL := "https://example.com/full"
 
-	exists, err := StorePair(Conf, shortID, fullURL)
+	exists, err := StorePair(Conf, userID, shortID, fullURL)
 	require.NoError(t, err)
 	assert.False(t, exists)
 
@@ -41,12 +42,13 @@ func TestStoreAndCheckPair(t *testing.T) {
 func TestProcessBatchTransaction(t *testing.T) {
 	memstorage.Store = memstorage.NewURLMap()
 
+	userID := "test-user-456"
 	requestBatch := []RequestEntry{
 		{CorrelationID: "a", OriginalURL: "https://test1.com"},
 		{CorrelationID: "b", OriginalURL: "https://test2.com"},
 	}
 
-	responseBatch, err := ProcessBatchTransaction(Conf, requestBatch)
+	responseBatch, err := ProcessBatchTransaction(Conf, requestBatch, userID)
 	require.NoError(t, err)
 	require.Len(t, responseBatch, 2)
 

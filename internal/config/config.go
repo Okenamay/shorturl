@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 	"sync"
 
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
@@ -21,6 +22,7 @@ const (
 	MigrDir     = ""                                             // Заглушка
 	DBReinit    = true                                           // Флаг переинициализации БД при старте
 	AuthKey     = "secret_key"                                   // Ключ авторизации.
+	TokenExp    = 24                                             // Срок истечения действия токена.
 )
 
 type Cfg struct {
@@ -36,10 +38,8 @@ type Cfg struct {
 	MigrateDirection  string
 	DBReinitialize    bool
 	AuthorizationKey  string
+	TokenExpiry       int
 }
-
-var useFile bool
-var useDSN bool
 
 func parseFlags() *Cfg {
 	config := &Cfg{}
@@ -52,12 +52,8 @@ func parseFlags() *Cfg {
 		"Адрес запуска сервера в формате host:port или :port")
 	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDAddr,
 		"Адрес коротких ID в формате host:port/path")
-	// Сделали дефолтным значением SaveFilePath "" – если флагом или переменной среды
-	// не задали значение, то никуда не будем писать:
 	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
-	// Аналогично с дефолтным значением PostgreDSN "" – если флагом или переменной среды
-	// не задали значение, то DSN будет пустой:
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
 	flag.BoolVar(&config.LogVerbose, "log", Verbose,
@@ -68,8 +64,10 @@ func parseFlags() *Cfg {
 		"Направление миграции БД (up = миграция, down = роллбек)")
 	flag.BoolVar(&config.DBReinitialize, "dbx", DBReinit,
 		"Реинициализация БД (bool)")
-	flag.StringVar(&config.AuthorizationKey, "s", AuthKey,
+	flag.StringVar(&config.AuthorizationKey, "k", AuthKey,
 		"Ключ для генерации JWT-токена")
+	flag.IntVar(&config.TokenExpiry, "txp", TokenExp,
+		"Срок истечения токена, часов")
 	flag.Parse()
 
 	var saveFilePath, postgreDSN string
@@ -93,12 +91,7 @@ func parseFlags() *Cfg {
 	}
 
 	if logVerbose, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
-		switch logVerbose {
-		case "true":
-			config.LogVerbose = true
-		default:
-			config.LogVerbose = false
-		}
+		config.LogVerbose = (logVerbose == "true")
 		logger.Zap.Infof("EnvVerbose = %s", logVerbose)
 	}
 
@@ -112,19 +105,24 @@ func parseFlags() *Cfg {
 		logger.Zap.Infof("EnvMigrDir = %s", migrateDirection)
 	}
 
-	if dbReinitialize, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
-		switch dbReinitialize {
-		case "true":
-			config.DBReinitialize = true
-		default:
-			config.DBReinitialize = false
-		}
+	if dbReinitialize, ok := os.LookupEnv("DB_REINIT"); ok {
+		config.DBReinitialize = (dbReinitialize == "true")
 		logger.Zap.Infof("EnvVerbose = %s", dbReinitialize)
 	}
 
 	if authorizationKey, ok := os.LookupEnv("AUTH_SECRET_KEY"); ok && authorizationKey != "" {
 		config.AuthorizationKey = authorizationKey
 		logger.Zap.Infof("EnvKey = %s", authorizationKey)
+	}
+
+	if tokenExpiryStr, ok := os.LookupEnv("TOKEN_EXPIRY"); ok && tokenExpiryStr != "" {
+		tokenExpiry, err := strconv.Atoi(tokenExpiryStr)
+		if err == nil {
+			config.TokenExpiry = tokenExpiry
+			logger.Zap.Infof("EnvExpiry = %s", tokenExpiryStr)
+		} else {
+			logger.Zap.Errorf("Could not process TOKEN_EXPIRY: %v", err)
+		}
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
@@ -136,6 +134,9 @@ func parseFlags() *Cfg {
 	} else {
 		config.MemMode = "memstore"
 	}
+
+	var useFile bool
+	var useDSN bool
 
 	logger.Zap.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
 		"useDSN: %t. useFile: %t. saveFilePath: %s. "+

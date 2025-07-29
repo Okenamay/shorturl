@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
@@ -15,6 +16,7 @@ type ResponseEntry = memselect.ResponseEntry
 func BatchHandlerTransaction(conf *config.Cfg) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger.Zap.Info("BatchHandlerTransaction. Start")
+		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		var requestBatch []RequestEntry
 		if err := json.NewDecoder(r.Body).Decode(&requestBatch); err != nil {
@@ -24,7 +26,7 @@ func BatchHandlerTransaction(conf *config.Cfg) http.HandlerFunc {
 		}
 
 		logger.Zap.Infof("Processing transactional batch of %d entries...", len(requestBatch))
-		responseBatch, err := memselect.ProcessBatchTransaction(conf, requestBatch)
+		responseBatch, err := memselect.ProcessBatchTransaction(conf, requestBatch, userID)
 		if err != nil {
 			logger.Zap.Errorw("Error processing transactional batch", "error", err)
 			http.Error(w, "Failed to process batch", http.StatusInternalServerError)
