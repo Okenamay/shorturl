@@ -111,10 +111,17 @@ func StorePair(conf *config.Cfg, userID, shortID, fullURL string) (bool, error) 
 	}
 }
 
-func CheckPair(conf *config.Cfg, queryID string) (string, error) {
-	fullURL, _ := memstorage.Store.Get(queryID)
+func CheckPair(conf *config.Cfg, queryID string) (database.URLInfo, error) {
+	if conf.MemMode == "postgres" {
+		return database.GetURLInfo(queryID)
+	}
 
-	return fullURL, nil
+	fullURL, _ := memstorage.Store.Get(queryID)
+	return database.URLInfo{OriginalURL: fullURL, IsDeleted: false}, nil
+}
+
+func BatchDelete(ctx context.Context, userID string, shortIDs []string) error {
+	return database.BatchDelete(ctx, userID, shortIDs)
 }
 
 type RequestEntry struct {

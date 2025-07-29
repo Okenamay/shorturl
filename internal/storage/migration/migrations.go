@@ -9,6 +9,15 @@ type MigrationEntry struct {
 }
 
 var migrations = map[string]MigrationEntry{
+	"20250720152000": {
+		ID: "20250720152000",
+		UpSQL: `
+            ALTER TABLE public.urls ADD COLUMN del_flag BOOLEAN DEFAULT false;
+        `,
+		DownSQL: `
+            ALTER TABLE public.urls DROP COLUMN IF EXISTS del_flag;
+        `,
+	},
 	"20250718110100": {
 		ID: "20250718110100",
 		UpSQL: `

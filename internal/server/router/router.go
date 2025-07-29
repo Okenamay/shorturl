@@ -23,6 +23,7 @@ func Launch(conf *config.Cfg) error {
 	router.Post("/api/shorten", handlers.JSONHandler(conf))
 	router.Post("/api/shorten/batch", handlers.BatchHandlerTransaction(conf))
 	router.Get("/api/user/urls", handlers.UserURLsHandler(conf))
+	router.Delete("/api/user/urls", handlers.BatchDeleter(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Post("/", handlers.ShortenHandler(conf))
 	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", handlers.RedirectHandler(conf))
 

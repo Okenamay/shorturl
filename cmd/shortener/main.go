@@ -5,6 +5,7 @@ import (
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/router"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
+	"github.com/Okenamay/shorturl.git/internal/worker"
 )
 
 func main() {
@@ -13,6 +14,8 @@ func main() {
 	}
 
 	conf := config.InitConfig()
+
+	worker.Start(memselect.BatchDelete)
 
 	err := memselect.MemInit(conf)
 	if err != nil {
@@ -29,5 +32,3 @@ func main() {
 
 	defer logger.Zap.Sync()
 }
-
-// 1) Доработать функционал БД и хендлера для работы с авторизацией.

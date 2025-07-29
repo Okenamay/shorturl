@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
@@ -49,6 +51,9 @@ func TestBatchHandlerTransaction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
 			request.Header.Set("Content-Type", "application/json")
+
+			ctx := context.WithValue(request.Context(), auth.UserIDContextKey, "test-user-batch")
+			request = request.WithContext(ctx)
 
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, request)

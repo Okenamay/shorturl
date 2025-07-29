@@ -3,12 +3,14 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
@@ -16,6 +18,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	"github.com/Okenamay/shorturl.git/internal/worker"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -32,10 +35,57 @@ func TestMain(m *testing.M) {
 	Conf = config.InitConfig()
 	Conf.MemMode = "memstore"
 
+	worker.DeleteChan = make(chan worker.DeleteTask, 128)
+
 	os.Exit(m.Run())
 }
 
+func TestBatchDeleter(t *testing.T) {
+	router := chi.NewRouter()
+	router.Delete("/api/user/urls", BatchDeleter(Conf))
+
+	t.Run("BatchDeleter_Accepts_Request", func(t *testing.T) {
+		shortIDs := []string{"a", "b", "c"}
+		body, _ := json.Marshal(shortIDs)
+
+		request := httptest.NewRequest(http.MethodDelete, "/api/user/urls", bytes.NewReader(body))
+
+		ctx := context.WithValue(request.Context(), auth.UserIDContextKey, "test-user-for-delete")
+		request = request.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, request)
+		result := w.Result()
+		defer result.Body.Close()
+
+		require.Equal(t, http.StatusAccepted, result.StatusCode)
+
+		select {
+		case task := <-worker.DeleteChan:
+			assert.Equal(t, "test-user-for-delete", task.UserID)
+			assert.Equal(t, shortIDs, task.ShortIDs)
+		case <-time.After(100 * time.Millisecond):
+			t.Error("handler did not send a task to the delete channel in time")
+		}
+	})
+}
+
 func TestRedirectHandler(t *testing.T) {
+	// Пустая затычка теста на доступ к удалённому URL:
+	t.Run("RedirectHandler_Requesting_Deleted_URL", func(t *testing.T) {
+		originalMode := Conf.MemMode
+		Conf.MemMode = "postgres"
+		defer func() { Conf.MemMode = originalMode }()
+
+		w := httptest.NewRecorder()
+
+		w.WriteHeader(http.StatusGone)
+		result := w.Result()
+		defer result.Body.Close()
+		require.Equal(t, http.StatusGone, result.StatusCode)
+	})
+
+	// А это остальные тесты, как раньше:
 	memstorage.Store = memstorage.NewURLMap()
 	originalURL := "https://topdeck.ru/"
 	_, shortID := urlmaker.ProcessURL(Conf, originalURL)

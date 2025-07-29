@@ -21,10 +21,10 @@ func PingHandler(conf *config.Cfg) http.HandlerFunc {
 		} else {
 			logger.Zap.Info("PingHandler. DB ping success")
 		}
+
 		if !pingOK {
-			logger.Zap.Infof("Database DSN: %s. MemMode: %s.",
-				conf.PostgreDSN, conf.MemMode)
-			logger.Zap.Errorw("PingHandler. DB ping failed", "error", err)
+			logger.Zap.Infof("PingHandler: DB not configured for ping. MemMode: %s.",
+				conf.MemMode)
 			http.Error(w, "Database not enabled", http.StatusInternalServerError)
 			return
 		}
