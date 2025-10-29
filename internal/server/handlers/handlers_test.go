@@ -30,7 +30,9 @@ var Conf *config.Cfg
 var TestLogger *zap.SugaredLogger
 
 func TestMain(m *testing.M) {
-	TestLogger, err := logger.InitLogger()
+	var err error
+
+	TestLogger, err = logger.InitLogger()
 	if err != nil {
 		TestLogger.Fatalw("Tests stopped - start logger FAIL", "error", err)
 	}
