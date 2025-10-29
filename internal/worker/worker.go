@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/database"
+	"go.uber.org/zap"
 )
 
 type DeleteTask struct {
@@ -15,9 +15,9 @@ type DeleteTask struct {
 
 var DeleteChan chan DeleteTask
 
-type BatchDeleteFunc func(ctx context.Context, userID string, shortIDs []string) error
+type BatchDeleteFunc func(ctx context.Context, appLogger *zap.SugaredLogger, userID string, shortIDs []string) error
 
-func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc) {
+func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc, appLogger *zap.SugaredLogger) {
 	var deleteBuffer []DeleteTask
 
 	flushBuffer := func() {
@@ -25,7 +25,7 @@ func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc) {
 			return
 		}
 
-		logger.Zap.Infof("Flushing %d deletion tasks from buffer", len(deleteBuffer))
+		appLogger.Infof("softDeleter started - flushing %d deletion tasks from buffer", len(deleteBuffer))
 
 		tasksByUser := make(map[string][]string)
 		for _, task := range deleteBuffer {
@@ -33,12 +33,13 @@ func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc) {
 		}
 
 		for userID, shortIDs := range tasksByUser {
-			err := batchDeleter(context.Background(), userID, shortIDs)
+			err := batchDeleter(context.Background(), appLogger, userID, shortIDs)
 			if err != nil {
-				logger.Zap.Errorw("Deletion worker failed to batch delete", "error", err, "userID", userID)
+				appLogger.Errorw("softDeleter stopped - deletion worker batch delete FAIL", "error", err, "userID", userID)
 			}
 		}
 
+		appLogger.Info("softDeleter finished - deletion worker batch delete OK")
 		deleteBuffer = nil
 	}
 
@@ -51,20 +52,20 @@ func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc) {
 			case task := <-deleteChan:
 				deleteBuffer = append(deleteBuffer, task)
 				if len(deleteBuffer) >= 25 {
-					logger.Zap.Info("Deletion buffer reached size threshold, flushing...")
+					appLogger.Info("softDeletion - buffer reached size threshold, flushing...")
 					flushBuffer()
 
 					ticker.Reset(2 * time.Second)
 				}
 			case <-ticker.C:
-				logger.Zap.Info("Deletion ticker fired, flushing buffer...")
+				appLogger.Info("softDeletion - deletion ticker fired, flushing...")
 				flushBuffer()
 			}
 		}
 	}()
 }
 
-func hardDeleter() {
+func hardDeleter(appLogger *zap.SugaredLogger) {
 	go func() {
 		ticker := time.NewTicker(20 * time.Second)
 		defer ticker.Stop()
@@ -72,18 +73,18 @@ func hardDeleter() {
 		for range ticker.C {
 			ctx := context.Background()
 
-			err := database.DeleteFlaggedURLs(ctx)
+			err := database.DeleteFlaggedURLs(ctx, appLogger)
 			if err != nil {
-				logger.Zap.Errorw("Hard delete worker failed", "error", err)
+				appLogger.Errorw("Hard delete worker failed", "error", err)
 			}
 		}
 	}()
 }
 
-func Start(batchDeleter BatchDeleteFunc) {
+func Start(batchDeleter BatchDeleteFunc, appLogger *zap.SugaredLogger) {
 	DeleteChan = make(chan DeleteTask, 1024)
-	softDeleter(DeleteChan, batchDeleter)
-	hardDeleter()
+	softDeleter(DeleteChan, batchDeleter, appLogger)
+	hardDeleter(appLogger)
 }
 
 func SendToDelete(userID string, shortIDs []string) {

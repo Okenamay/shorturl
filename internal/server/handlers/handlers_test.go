@@ -19,6 +19,7 @@ import (
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/Okenamay/shorturl.git/internal/worker"
+	"go.uber.org/zap"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -26,11 +27,14 @@ import (
 )
 
 var Conf *config.Cfg
+var TestLogger *zap.SugaredLogger
 
 func TestMain(m *testing.M) {
-	if err := logger.InitLogger(); err != nil {
-		logger.Zap.Fatalw(err.Error(), "Tests", "Start logger")
+	TestLogger, err := logger.InitLogger()
+	if err != nil {
+		TestLogger.Fatalw("Tests stopped - start logger FAIL", "error", err)
 	}
+	defer TestLogger.Sync()
 
 	Conf = config.InitConfig()
 	Conf.MemMode = "memstore"
@@ -133,7 +137,10 @@ func TestRedirectHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.With(gzipper.Decompressor, gzipper.Compressor).Get("/{id}", RedirectHandler(Conf))
+	router.With(
+		gzipper.Decompressor(TestLogger),
+		gzipper.Compressor(TestLogger),
+	).Get("/{id}", RedirectHandler(Conf, TestLogger))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -263,7 +270,7 @@ func TestShortenHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.Post("/", ShortenHandler(Conf))
+	router.Post("/", ShortenHandler(Conf, TestLogger))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -292,7 +299,7 @@ func TestShortenHandler(t *testing.T) {
 
 func TestUserURLsHandler(t *testing.T) {
 	router := chi.NewRouter()
-	router.Get("/api/user/urls", UserURLsHandler(Conf))
+	router.Get("/api/user/urls", UserURLsHandler(Conf, TestLogger))
 
 	t.Run("UserURLsHandler_Unauthorized", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
