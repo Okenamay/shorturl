@@ -54,7 +54,7 @@ func TestProcessBatchTransaction(t *testing.T) {
 	require.Len(t, responseBatch, 2)
 
 	assert.Equal(t, "a", responseBatch[0].CorrelationID)
-	assert.Contains(t, responseBatch[0].ShortURL, Conf.ShortIDServerPort)
+	assert.Contains(t, responseBatch[0].ShortURL, Conf.ShortIDAddress)
 
 	allStored := memstorage.Store.GetAll()
 	assert.Len(t, allStored, 2)

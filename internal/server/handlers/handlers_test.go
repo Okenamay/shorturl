@@ -85,7 +85,6 @@ func TestRedirectHandler(t *testing.T) {
 		require.Equal(t, http.StatusGone, result.StatusCode)
 	})
 
-	// А это остальные тесты, как раньше:
 	memstorage.Store = memstorage.NewURLMap()
 	originalURL := "https://topdeck.ru/"
 	_, shortID := urlmaker.ProcessURL(Conf, originalURL)
