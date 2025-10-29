@@ -132,7 +132,6 @@ func parseFlags() *Cfg {
 		tokenExpiry, err := strconv.Atoi(tokenExpiryStr)
 		if err == nil {
 			config.TokenExpiry = tokenExpiry
-		} else {
 		}
 	}
 	if auditFile, ok := os.LookupEnv("AUDIT_FILE"); ok {
