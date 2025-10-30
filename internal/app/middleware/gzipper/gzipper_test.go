@@ -82,7 +82,7 @@ func TestCompressorMiddleware(t *testing.T) {
 		},
 		{
 			name:                 "Gzip NOT accepted",
-			acceptEncodingHeader: "identity", // "identity" - это без сжатия
+			acceptEncodingHeader: "identity", // без сжатия
 			contentType:          "application/json",
 			wantCompressed:       false,
 		},
@@ -124,7 +124,7 @@ func TestDecompressorMiddleware(t *testing.T) {
 	testLogger := zap.NewNop().Sugar()
 	const requestBody = `{"ping": "pong"}`
 
-	// nextHandler - это "эхо-сервер", который читает тело запроса и пишет его
+	// nextHandler - это эхо-сервер, который читает тело запроса и пишет его
 	// в тело ответа. Если декомпрессия успешна, он вернет распакованное тело
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)

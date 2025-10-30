@@ -14,7 +14,7 @@ import (
 const testSecretKey = "super-secret-key-for-testing"
 
 // TestJWTAuthRoundTrip проверяет, что мы можем успешно создать токен и сразу
-// же его проверить (round-trip)
+// же его проверить
 func TestJWTAuthRoundTrip(t *testing.T) {
 	conf := &config.Cfg{
 		TokenExpiry:      24,
@@ -62,7 +62,7 @@ func TestAuthenticatorMiddleware(t *testing.T) {
 		AuthorizationKey: testSecretKey,
 	}
 
-	// dummyHandler - это "внутренний" хендлер, который будет вызван, если
+	// dummyHandler - это внутренний хендлер, который будет вызван, если
 	// middleware пропустит запрос. Он проверяет контекст и пишет userID в тело
 	// ответа
 	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
