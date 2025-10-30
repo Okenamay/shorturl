@@ -70,7 +70,8 @@ func TestCompressorMiddleware(t *testing.T) {
 		},
 		{
 			name:                 "Gzip accepted, valid Content-Type (html)",
-			acceptEncodingHeader: "text/html; charset=utf-8",
+			acceptEncodingHeader: "gzip",
+			contentType:          "text/html; charset=utf-8",
 			wantCompressed:       true,
 		},
 		{
