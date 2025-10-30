@@ -142,7 +142,7 @@ func TestRedirectHandler(t *testing.T) {
 	router.With(
 		gzipper.Decompressor(TestLogger),
 		gzipper.Compressor(TestLogger),
-	).Get("/{id}", RedirectHandler(Conf, TestLogger))
+	).Get("/{id}", RedirectHandler(Conf, TestLogger, nil))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestShortenHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.Post("/", ShortenHandler(Conf, TestLogger))
+	router.Post("/", ShortenHandler(Conf, TestLogger, nil))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

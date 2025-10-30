@@ -6,6 +6,7 @@ import (
 
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/gzipper"
+	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/handlers"
@@ -14,14 +15,14 @@ import (
 )
 
 // Запуск HTTP-сервера и работа с запросами:
-func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger) error {
+func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) error {
 	router := chi.NewRouter()
 
 	router.Use(logger.WithLogging(appLogger))
 	router.Use(auth.Authenticator(conf))
 
 	router.Get("/ping", handlers.PingHandler(conf, appLogger))
-	router.Post("/api/shorten", handlers.JSONHandler(conf, appLogger))
+	router.Post("/api/shorten", handlers.JSONHandler(conf, appLogger, auditor))
 	router.Post("/api/shorten/batch", handlers.BatchHandlerTransaction(conf, appLogger))
 	router.Get("/api/user/urls", handlers.UserURLsHandler(conf, appLogger))
 	router.Delete("/api/user/urls", handlers.BatchDeleter(conf))
@@ -29,11 +30,11 @@ func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger) error {
 	router.With(
 		gzipper.Decompressor(appLogger),
 		gzipper.Compressor(appLogger),
-	).Post("/", handlers.ShortenHandler(conf, appLogger))
+	).Post("/", handlers.ShortenHandler(conf, appLogger, auditor))
 	router.With(
 		gzipper.Decompressor(appLogger),
 		gzipper.Compressor(appLogger),
-	).Get("/{id}", handlers.RedirectHandler(conf, appLogger))
+	).Get("/{id}", handlers.RedirectHandler(conf, appLogger, auditor))
 
 	server := http.Server{
 		Addr:        conf.ServerPort,

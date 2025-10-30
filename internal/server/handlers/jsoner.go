@@ -9,6 +9,7 @@ import (
 	emsg "github.com/Okenamay/shorturl.git/internal/app/errmsg"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
+	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ type JSONResponse struct {
 }
 
 // Обработка запроса на переход по JSON-запросу:
-func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
+func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("JSONHandler started")
 
@@ -58,6 +59,10 @@ func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFun
 		if err != nil {
 			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		if auditor != nil {
+			auditor.LogEvent(r.Context(), "shorten", userID, fullURL)
 		}
 
 		response := JSONResponse{

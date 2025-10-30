@@ -9,6 +9,7 @@ import (
 	emsg "github.com/Okenamay/shorturl.git/internal/app/errmsg"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
+	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/Okenamay/shorturl.git/internal/worker"
@@ -17,7 +18,7 @@ import (
 )
 
 // Обработка запросов на сокращение URL:
-func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
+func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("ShortenHandler started")
 		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
@@ -44,6 +45,10 @@ func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.Handler
 			return
 		}
 
+		if auditor != nil {
+			auditor.LogEvent(r.Context(), "shorten", userID, fullURL)
+		}
+
 		w.Header().Set("Content-Type", "text/plain")
 		if exists {
 			appLogger.Warn("ShortenHandler stopped - already exists")
@@ -57,9 +62,10 @@ func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.Handler
 }
 
 // Обработка запроса на переход по полному URL:
-func RedirectHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
+func RedirectHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("RedirectHandler started")
+		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		queryID := chi.URLParam(r, "id")
 
@@ -85,6 +91,10 @@ func RedirectHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.Handle
 			appLogger.Warn("RedirectHandler stopped - URL deleted")
 			w.WriteHeader(http.StatusGone)
 			return
+		}
+
+		if auditor != nil {
+			auditor.LogEvent(r.Context(), "follow", userID, urlInfo.OriginalURL)
 		}
 
 		appLogger.Info("RedirectHandler finished")

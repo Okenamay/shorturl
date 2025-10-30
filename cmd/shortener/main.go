@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/router"
@@ -17,6 +18,7 @@ func main() {
 	defer appLogger.Sync()
 
 	conf := config.InitConfig()
+	auditor := audit.NewAuditor(conf.AuditFile, conf.AuditURL, appLogger)
 
 	worker.Start(memselect.BatchDelete, appLogger)
 
@@ -28,7 +30,7 @@ func main() {
 
 	appLogger.Infof("Starting server on port: %s", conf.ServerPort)
 
-	err = router.Launch(conf, appLogger)
+	err = router.Launch(conf, appLogger, auditor)
 	if err != nil {
 		appLogger.Fatalw(err.Error(), "Main", "Start server")
 	}
