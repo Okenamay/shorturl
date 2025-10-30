@@ -4,11 +4,15 @@ import (
 	"context"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
 
-func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg, appLogger *zap.SugaredLogger) error {
+type DBExecutor interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+}
+
+func MigrateLauncher(ctx context.Context, dbpool DBExecutor, conf *config.Cfg, appLogger *zap.SugaredLogger) error {
 	appLogger.Info("MigrateLauncher started")
 
 	if conf.MigrateID == "" {
@@ -48,5 +52,4 @@ func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg
 		appLogger.Warnf("MigrateLauncher finished - incorrect migration direction: %s", conf.MigrateDirection)
 		return nil
 	}
-
 }

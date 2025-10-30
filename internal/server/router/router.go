@@ -16,6 +16,23 @@ import (
 
 // Запуск HTTP-сервера и работа с запросами:
 func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) error {
+	router := NewRouter(conf, appLogger, auditor)
+
+	server := http.Server{
+		Addr:        conf.ServerPort,
+		Handler:     router,
+		IdleTimeout: time.Duration(conf.IdleTimeout) * time.Second,
+	}
+
+	err := server.ListenAndServe()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func NewRouter(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.Handler {
 	router := chi.NewRouter()
 
 	router.Use(logger.WithLogging(appLogger))
@@ -36,16 +53,5 @@ func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Audit
 		gzipper.Compressor(appLogger),
 	).Get("/{id}", handlers.RedirectHandler(conf, appLogger, auditor))
 
-	server := http.Server{
-		Addr:        conf.ServerPort,
-		Handler:     router,
-		IdleTimeout: time.Duration(conf.IdleTimeout) * time.Second,
-	}
-
-	err := server.ListenAndServe()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return router
 }
