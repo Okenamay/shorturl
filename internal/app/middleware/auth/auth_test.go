@@ -83,9 +83,12 @@ func TestAuthenticatorMiddleware(t *testing.T) {
 
 		authMiddleware.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusOK, rr.Code)
+		result := rr.Result()
+		defer result.Body.Close()
 
-		cookie := rr.Result().Cookies()[0]
+		assert.Equal(t, http.StatusOK, result.StatusCode)
+
+		cookie := result.Cookies()[0]
 		assert.Equal(t, "token", cookie.Name)
 		assert.NotEmpty(t, cookie.Value)
 
