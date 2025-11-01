@@ -3,8 +3,8 @@
 CREATE TABLE IF NOT EXISTS public.urls (
     id BIGSERIAL PRIMARY KEY,
     user_id VARCHAR(36),
-    url VARCHAR(1024),
-    short_id VARCHAR(10),
+    url VARCHAR(1024) UNIQUE,
+    short_id VARCHAR(10) UNIQUE,
 	del_flag BOOLEAN DEFAULT false
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON public.urls (url, short_id);
