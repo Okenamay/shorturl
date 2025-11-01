@@ -109,7 +109,7 @@ func ExampleJSONHandler() {
 
 // ExampleRedirectHandler демонстрирует редирект с короткого URL
 func ExampleRedirectHandler() {
-	server, conf := setupExampleServer()
+	server, _ := setupExampleServer()
 	defer server.Close()
 
 	client := server.Client()
