@@ -2,54 +2,53 @@ package migration
 
 import (
 	"context"
+	"database/sql"
+	"embed"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
-	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"go.uber.org/zap"
 )
 
-type DBExecutor interface {
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
-}
+//go:embed migrations/*.sql
+var embedMigrations embed.FS
 
-func MigrateLauncher(ctx context.Context, dbpool DBExecutor, conf *config.Cfg, appLogger *zap.SugaredLogger) error {
+// MigrateLauncher запускает процесс миграции с помощью goose
+func MigrateLauncher(ctx context.Context, conf *config.Cfg, appLogger *zap.SugaredLogger) error {
 	appLogger.Info("MigrateLauncher started")
 
-	if conf.MigrateID == "" {
-		appLogger.Warn("MigrateLauncher stopped - migration disabled")
+	if conf.PostgreDSN == "" {
+		appLogger.Warn("MigrateLauncher skipped - Database URI not set")
 		return nil
 	}
 
-	appLogger.Infof("MigrateLauncher - attempting migration for ID: %s, direction: %s",
-		conf.MigrateID, conf.MigrateDirection)
+	db, err := sql.Open("pgx", conf.PostgreDSN)
+	if err != nil {
+		appLogger.Errorw("MigrateLauncher stopped - DB connection open FAIL", "error", err)
+		return err
+	}
+	defer db.Close()
 
-	migration := DeliverMigration(conf)
-	if migration.ID == "" {
-		appLogger.Warnf("MigrateLauncher stopped - unknown migration ID: %s", conf.MigrateID)
-		return nil
+	if err := db.PingContext(ctx); err != nil {
+		appLogger.Errorw("MigrateLauncher stopped - DB ping FAIL", "error", err)
+		return err
 	}
 
-	switch conf.MigrateDirection {
-	case "up":
-		_, err := dbpool.Exec(ctx, migration.UpSQL)
-		if err != nil {
-			appLogger.Errorf("MigrateLauncher stopped - migration ID: %s FAIL", migration.ID, "error", err)
-			return err
-		}
+	goose.SetBaseFS(embedMigrations)
 
-		appLogger.Infof("MigrateLauncher finished - migration: %s OK", migration.ID)
-		return nil
-	case "down":
-		_, err := dbpool.Exec(ctx, migration.DownSQL)
-		if err != nil {
-			appLogger.Errorf("MigrateLauncher stopped - rollback ID: %s FAIL", migration.ID, "error", err)
-			return err
-		}
-
-		appLogger.Infof("MigrateLauncher finished - applied rollback: %s OK", migration.ID)
-		return nil
-	default:
-		appLogger.Warnf("MigrateLauncher finished - incorrect migration direction: %s", conf.MigrateDirection)
-		return nil
+	if err := goose.SetDialect("postgres"); err != nil {
+		appLogger.Errorw("MigrateLauncher stopped - set goose dialect FAIL", "error", err)
+		return err
 	}
+
+	appLogger.Info("MigrateLauncher - running DB migrations...")
+
+	if err := goose.UpContext(ctx, db, "migrations"); err != nil {
+		appLogger.Errorw("MigrateLauncher stopped - apply migrations FAIL", "error", err)
+		return err
+	}
+
+	appLogger.Info("MigrateLauncher finished - DB migrations OK")
+	return nil
 }

@@ -63,22 +63,25 @@ func TestCompressorMiddleware(t *testing.T) {
 		wantCompressed       bool
 	}{
 		{
-			name:                 "Gzip accepted, valid Content-Type (json)",
+			name:                 "Gzip accepted, Content-Type (json)",
 			acceptEncodingHeader: "gzip",
 			contentType:          "application/json",
 			wantCompressed:       true,
 		},
 		{
-			name:                 "Gzip accepted, valid Content-Type (html)",
+			name:                 "Gzip accepted, Content-Type (html)",
 			acceptEncodingHeader: "gzip",
 			contentType:          "text/html; charset=utf-8",
 			wantCompressed:       true,
 		},
 		{
-			name:                 "Gzip accepted, invalid Content-Type (text/plain)",
+			// Изменение:
+			// Новая потоковая логика сжимает ЛЮБОЙ Content-Type, если клиент
+			// принимает gzip.
+			name:                 "Gzip accepted, any Content-Type (text/plain)",
 			acceptEncodingHeader: "gzip",
 			contentType:          "text/plain",
-			wantCompressed:       false,
+			wantCompressed:       true,
 		},
 		{
 			name:                 "Gzip NOT accepted",
@@ -184,11 +187,6 @@ var (
 		return req
 	}()
 	benchDecompressReqBody = mustCompress(&testing.T{}, `{"field_one": "value_one", "field_two": "value_two"}`)
-	benchDecompressReq     = func() *http.Request {
-		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(benchDecompressReqBody.Bytes()))
-		req.Header.Set("Content-Encoding", "gzip")
-		return req
-	}()
 )
 
 func BenchmarkCompressorMiddleware(b *testing.B) {

@@ -11,6 +11,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 // setupTest - вспомогательная функция для настройки тестового окружения,
@@ -31,6 +32,7 @@ func setupTest(t *testing.T) *config.Cfg {
 // TestSaveLoad_Roundtrip проверяет полный цикл: запись в файл и последующая
 // загрузка
 func TestSaveLoad_Roundtrip(t *testing.T) {
+	testLogger := zap.NewNop().Sugar()
 	conf := setupTest(t)
 
 	testData := map[string]string{
@@ -41,13 +43,13 @@ func TestSaveLoad_Roundtrip(t *testing.T) {
 		memstorage.Store.Set(k, v)
 	}
 
-	err := SaveFile(conf)
+	err := SaveFile(conf, testLogger)
 	require.NoError(t, err, "SaveFile не должен возвращать ошибку")
 
 	memstorage.Store = memstorage.NewURLMap()
 	require.Empty(t, memstorage.Store.GetAll(), "Хранилище должно быть пустым после сброса")
 
-	err = LoadFile(conf)
+	err = LoadFile(conf, testLogger)
 	require.NoError(t, err, "LoadFile не должен возвращать ошибку")
 
 	loadedData := memstorage.Store.GetAll()
@@ -57,10 +59,11 @@ func TestSaveLoad_Roundtrip(t *testing.T) {
 // TestLoadFile_NotExist проверяет, что LoadFile не возвращает ошибку, если
 // файл сохранения еще не существует
 func TestLoadFile_NotExist(t *testing.T) {
+	testLogger := zap.NewNop().Sugar()
 	conf := setupTest(t)
 	// Мы не создаем файл, conf.SaveFilePath указывает на несуществующий путь
 
-	err := LoadFile(conf)
+	err := LoadFile(conf, testLogger)
 	require.NoError(t, err, "LoadFile должен вернуть nil, если файл не найден (IsNotExist)")
 
 	assert.Empty(t, memstorage.Store.GetAll(), "Хранилище должно быть пустым, если файл не найден")
@@ -69,6 +72,7 @@ func TestLoadFile_NotExist(t *testing.T) {
 // TestLoadFile_CorruptedData проверяет, что LoadFile возвращает ошибку, если
 // файл содержит невалидные (не JSON) данные
 func TestLoadFile_CorruptedData(t *testing.T) {
+	testLogger := zap.NewNop().Sugar()
 	conf := setupTest(t)
 
 	// Записываем мусор в файл
@@ -77,7 +81,7 @@ func TestLoadFile_CorruptedData(t *testing.T) {
 	require.NoError(t, err, "Не удалось записать тестовые данные в файл")
 
 	// Пытаемся загрузить мусор
-	err = LoadFile(conf)
+	err = LoadFile(conf, testLogger)
 	require.Error(t, err, "LoadFile должен вернуть ошибку при чтении поврежденного файла")
 
 	assert.Empty(t, memstorage.Store.GetAll(), "Хранилище должно быть пустым, если файл поврежден")
@@ -86,6 +90,7 @@ func TestLoadFile_CorruptedData(t *testing.T) {
 // TestSaveFile_Truncate проверяет, что SaveFile перезаписывает (O_TRUNC)
 // существующий файл, а не добавляет в него
 func TestSaveFile_Truncate(t *testing.T) {
+	testLogger := zap.NewNop().Sugar()
 	conf := setupTest(t)
 
 	junkData := []byte("old data that must be truncated")
@@ -94,7 +99,7 @@ func TestSaveFile_Truncate(t *testing.T) {
 
 	memstorage.Store.Set("newID", "https://new.com")
 
-	err = SaveFile(conf)
+	err = SaveFile(conf, testLogger)
 	require.NoError(t, err)
 
 	fileData, err := os.ReadFile(conf.SaveFilePath)
@@ -115,6 +120,7 @@ func TestSaveFile_Truncate(t *testing.T) {
 
 // prepareBenchFile создает "золотой" файл для бенчмарков загрузки
 func prepareBenchFile(b *testing.B, numRecords int) *config.Cfg {
+	testLogger := zap.NewNop().Sugar()
 	b.Helper()
 	tempDir := b.TempDir()
 	tempFile := filepath.Join(tempDir, "bench_save.json")
@@ -132,7 +138,7 @@ func prepareBenchFile(b *testing.B, numRecords int) *config.Cfg {
 	memstorage.Store = store
 
 	// Сохраняем файл
-	err := SaveFile(conf)
+	err := SaveFile(conf, testLogger)
 	if err != nil {
 		b.Fatalf("Failed to prepare bench file: %v", err)
 	}
@@ -141,6 +147,7 @@ func prepareBenchFile(b *testing.B, numRecords int) *config.Cfg {
 }
 
 func BenchmarkSaveFile(b *testing.B) {
+	testLogger := zap.NewNop().Sugar()
 	tempDir := b.TempDir()
 	tempFile := filepath.Join(tempDir, "bench_save.json")
 
@@ -160,13 +167,14 @@ func BenchmarkSaveFile(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// SaveFile по своей природе перезаписывает (Truncate) файл,
 		// поэтому нам не нужно его удалять в цикле
-		if err := SaveFile(conf); err != nil {
+		if err := SaveFile(conf, testLogger); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func BenchmarkLoadFile(b *testing.B) {
+	testLogger := zap.NewNop().Sugar()
 	// Создаем "золотой" файл с 100 записями один раз
 	conf := prepareBenchFile(b, 100)
 
@@ -178,7 +186,7 @@ func BenchmarkLoadFile(b *testing.B) {
 		memstorage.Store = memstorage.NewURLMap()
 		b.StartTimer()
 
-		if err := LoadFile(conf); err != nil {
+		if err := LoadFile(conf, testLogger); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Okenamay/shorturl.git/internal/config"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+	"github.com/Okenamay/shorturl.git/internal/storage/migration"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -93,29 +94,17 @@ func DBPing(appLogger *zap.SugaredLogger) error {
 
 // DBReinit (пере)создает таблицу в БД
 func DBReinit(conf *config.Cfg, appLogger *zap.SugaredLogger) error {
-	appLogger.Info("DBReinit started")
+	appLogger.Info("DBReinit started - calling MigrateLauncher...")
 
-	sql := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS urls (
-		id BIGSERIAL PRIMARY KEY,
-		user_id VARCHAR(36),
-		url VARCHAR(1024) UNIQUE,
-		short_id VARCHAR(%d) UNIQUE,
-		del_flag BOOLEAN DEFAULT false
-	);
-	`, conf.ShortIDLen)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	if DBPool == nil {
-		appLogger.Errorw("DBReinit stopped - DB pool init FAIL", "error")
-		return fmt.Errorf("DBReinit. DB pool is not initialized")
-	}
-
-	_, err := DBPool.Exec(context.Background(), sql)
+	err := migration.MigrateLauncher(ctx, conf, appLogger)
 	if err != nil {
-		appLogger.Errorw("DBReinit stopped - create table FAIL", "error", err)
+		appLogger.Errorw("DBReinit stopped - MigrateLauncher FAIL", "error", err)
 		return err
 	}
 
-	appLogger.Info("DBReinit finished - table created or already exists")
+	appLogger.Info("DBReinit finished - migration complete")
 	return nil
 }

@@ -26,7 +26,7 @@ func MemInit(conf *config.Cfg, appLogger *zap.SugaredLogger) error {
 		}
 		appLogger.Info("MemInit finished - init DB OK")
 	case "savefile":
-		err = savefile.LoadFile(conf)
+		err = savefile.LoadFile(conf, appLogger)
 		if err != nil {
 			appLogger.Errorw("MemInit stopped - load savefile failed", "error", err)
 			return err
@@ -94,7 +94,7 @@ func StorePair(conf *config.Cfg, appLogger *zap.SugaredLogger, userID, shortID, 
 	case "savefile":
 		memstorage.Store.Set(shortID, fullURL)
 
-		if err := savefile.SaveFile(conf); err != nil {
+		if err := savefile.SaveFile(conf, appLogger); err != nil {
 			appLogger.Errorw("StorePair stopped - save savefile FAIL", "error", err)
 			return false, err
 		}
@@ -167,7 +167,7 @@ func ProcessBatchTransaction(conf *config.Cfg, appLogger *zap.SugaredLogger, req
 	}
 
 	if conf.MemMode == "savefile" {
-		if err := savefile.SaveFile(conf); err != nil {
+		if err := savefile.SaveFile(conf, appLogger); err != nil {
 			appLogger.Errorw("ProcessBatchTransaction stopped - save savefile FAIL", "error", err)
 			return nil, err
 		}
