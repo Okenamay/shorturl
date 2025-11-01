@@ -173,3 +173,53 @@ func TestDecompressorMiddleware(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
 }
+
+// --- Бенчмарки ---
+
+var (
+	benchLogger      = zap.NewNop().Sugar()
+	benchCompressReq = func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		return req
+	}()
+	benchDecompressReqBody = mustCompress(&testing.T{}, `{"field_one": "value_one", "field_two": "value_two"}`)
+	benchDecompressReq     = func() *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(benchDecompressReqBody.Bytes()))
+		req.Header.Set("Content-Encoding", "gzip")
+		return req
+	}()
+)
+
+func BenchmarkCompressorMiddleware(b *testing.B) {
+	handler := Compressor(benchLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"field_one": "value_one", "field_two": "value_two"}`))
+	}))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, benchCompressReq)
+	}
+}
+
+func BenchmarkDecompressorMiddleware(b *testing.B) {
+	handler := Decompressor(benchLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Читаем тело, чтобы r.Body был полностью обработан
+		io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Необходимо создать новый ридер для тела, т.к. оно читается 1 раз
+		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(benchDecompressReqBody.Bytes()))
+		req.Header.Set("Content-Encoding", "gzip")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+	}
+}

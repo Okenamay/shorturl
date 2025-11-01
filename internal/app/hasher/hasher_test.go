@@ -68,3 +68,21 @@ func TestShortenURL(t *testing.T) {
 		assert.NotEqual(t, hash1, hash2)
 	})
 }
+
+// --- Бенчмарки ---
+
+var (
+	benchConf   = &config.Cfg{ShortIDLen: 10}
+	benchResult string
+)
+
+func BenchmarkShortenURL(b *testing.B) {
+	rawURL := "https://practicum.yandex.ru/trainer/go-developer/"
+	b.ReportAllocs()
+	b.ResetTimer() // Сбрасываем таймер, чтобы не учитывать инициализацию
+	for i := 0; i < b.N; i++ {
+		// Присваиваем глобальной переменной, чтобы компилятор
+		// не "оптимизировал" и не удалил вызов функции
+		benchResult = ShortenURL(benchConf, rawURL)
+	}
+}

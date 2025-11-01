@@ -42,3 +42,33 @@ func TestProcessURL(t *testing.T) {
 	expectedShortID := hasher.ShortenURL(testConf, fullURL)
 	assert.Equal(t, expectedShortID, shortID)
 }
+
+// --- Бенчмарки ---
+
+func BenchmarkMakeFullURL(b *testing.B) {
+	testConf := &config.Cfg{
+		ShortIDAddress: "http://localhost:8080",
+	}
+	testShortID := "aBcDeF12"
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = MakeFullURL(testConf, testShortID)
+	}
+}
+
+func BenchmarkProcessURL(b *testing.B) {
+	testConf := &config.Cfg{
+		ShortIDAddress: "http://example.com",
+		ShortIDLen:     8,
+	}
+	fullURL := "https://practicum.yandex.ru/some/very/long/path/to/benchmark"
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Результат присваиваем, чтобы компилятор не "выкинул" вызов
+		_, _ = ProcessURL(testConf, fullURL)
+	}
+}

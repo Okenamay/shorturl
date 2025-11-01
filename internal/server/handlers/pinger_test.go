@@ -43,3 +43,24 @@ func TestPingHandler(t *testing.T) {
 		})
 	}
 }
+
+// --- Бенчмарки ---
+
+func BenchmarkPingHandler(b *testing.B) {
+	// Настраиваем MemMode для бенчмарка (предполагаем ошибку, т.к. нет БД)
+	originalMode := Conf.MemMode
+	Conf.MemMode = "memstore" // PingDB вернет ошибку
+	defer func() { Conf.MemMode = originalMode }()
+
+	router := chi.NewRouter()
+	router.Get("/ping", PingHandler(Conf, TestLogger))
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+	}
+}

@@ -73,3 +73,35 @@ func TestBatchHandlerTransaction(t *testing.T) {
 		})
 	}
 }
+
+// --- Бенчмарки ---
+
+func BenchmarkBatchHandlerTransaction(b *testing.B) {
+	router := chi.NewRouter()
+	router.Post("/api/shorten/batch", BatchHandlerTransaction(Conf, TestLogger))
+
+	requestPayload := []RequestEntry{
+		{CorrelationID: "1", OriginalURL: "https://google.com"},
+		{CorrelationID: "2", OriginalURL: "https://yandex.ru"},
+		{CorrelationID: "3", OriginalURL: "https://bing.com"},
+	}
+	body, _ := json.Marshal(requestPayload)
+	bodyBytes := body
+
+	// Готовим контекст с userID
+	ctx := context.WithValue(context.Background(), auth.UserIDContextKey, "bench-user-batch")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()                             // Останавливаем таймер для подготовки
+		memstorage.Store = memstorage.NewURLMap() // Сбрасываем хранилище
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(ctx)
+		rr := httptest.NewRecorder()
+		b.StartTimer() // Запускаем таймер для выполнения
+
+		router.ServeHTTP(rr, req)
+	}
+}

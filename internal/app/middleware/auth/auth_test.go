@@ -157,3 +157,61 @@ func TestCheckAuth(t *testing.T) {
 		assert.Empty(t, userID)
 	})
 }
+
+// --- Бенчмарки ---
+
+var (
+	benchConf = &config.Cfg{
+		TokenExpiry:      24,
+		AuthorizationKey: testSecretKey,
+	}
+	benchUserID   = "benchmark-user-id"
+	benchResult   string
+	benchCtx      context.Context
+	benchToken, _ = buildJWTString(benchConf, benchUserID)
+)
+
+func BenchmarkBuildJWTString(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchResult, _ = buildJWTString(benchConf, benchUserID)
+	}
+}
+
+func BenchmarkGetUserID(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchResult, _ = getUserID(benchConf, benchToken)
+	}
+}
+
+func BenchmarkAuthenticatorMiddleware(b *testing.B) {
+	dummyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		benchCtx = r.Context() // Сохраняем контекст, чтобы избежать оптимизации
+		w.WriteHeader(http.StatusOK)
+	})
+	authMiddleware := Authenticator(benchConf)(dummyHandler)
+
+	validCookieReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	validCookieReq.AddCookie(&http.Cookie{Name: "token", Value: benchToken})
+
+	b.Run("NewUser (No Cookie)", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			// Необходимо создавать новый запрос в цикле, т.к. ServeHTTP может
+			// его модифицировать
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rr := httptest.NewRecorder()
+			authMiddleware.ServeHTTP(rr, req)
+		}
+	})
+
+	b.Run("ValidUser (Valid Cookie)", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			rr := httptest.NewRecorder()
+			// req можно переиспользовать, т.к. он не меняется
+			authMiddleware.ServeHTTP(rr, validCookieReq)
+		}
+	})
+}

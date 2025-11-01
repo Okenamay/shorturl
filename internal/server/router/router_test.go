@@ -90,3 +90,52 @@ func TestRoutes(t *testing.T) {
 		})
 	}
 }
+
+// --- Бенчмарки ---
+
+func BenchmarkRoutes(b *testing.B) {
+	// Тестовые сценарии, аналогичные TestRoutes
+	tests := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{
+			name:   "GET /ping",
+			method: http.MethodGet,
+			path:   "/ping",
+		},
+		{
+			name:   "GET nonexistent route",
+			method: http.MethodGet,
+			path:   "/nonexistent/route",
+		},
+		{
+			name:   "Method not allowed for /",
+			method: http.MethodGet,
+			path:   "/",
+		},
+		{
+			name:   "Auth middleware check (unauthorized)",
+			method: http.MethodGet,
+			path:   "/api/user/urls",
+		},
+	}
+
+	// Запускаем бенчмарк для каждого сценария
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// Создаем запрос и рекордер на каждой итерации
+				req := httptest.NewRequest(tt.method, tt.path, nil)
+				rr := httptest.NewRecorder()
+
+				// Выполняем запрос напрямую через testRouter.ServeHTTP, что
+				// быстрее, чем запускать httptest.Server
+				testRouter.ServeHTTP(rr, req)
+			}
+		})
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -187,5 +188,49 @@ func TestFileMutexConcurrent(t *testing.T) {
 	assert.Len(t, receivedUsers, numRoutines)
 	for i := 0; i < numRoutines; i++ {
 		assert.True(t, receivedUsers[fmt.Sprintf("user-%d", i)])
+	}
+}
+
+// --- Бенчмарки ---
+
+func BenchmarkLogEventToFile(b *testing.B) {
+	logger := newTestLogger()
+	tmpfile, err := os.CreateTemp("", "bench-audit-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+	filePath := tmpfile.Name()
+	tmpfile.Close()
+	defer os.Remove(filePath)
+
+	auditor := NewAuditor(filePath, "", logger)
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// LogEvent сам по себе неблокирующий (запускает горутину), поэтому, по
+		// сути, мы измеряем только скорость создания события и запуска горутины
+		auditor.LogEvent(ctx, "benchmark", "bench-user", "https://bench.test")
+	}
+}
+
+func BenchmarkLogEventToURL(b *testing.B) {
+	logger := newTestLogger()
+	// Создаем "пустой" сервер, который просто принимает запрос
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Читаем тело, чтобы r.Body был полностью обработан
+		io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	auditor := NewAuditor("", ts.URL, logger)
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		auditor.LogEvent(ctx, "benchmark", "bench-user", "https://bench.test")
 	}
 }

@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -110,4 +111,68 @@ func TestWorker_SoftDelete(t *testing.T) {
 			t.Fatal("Тест упал по таймауту в ожидании сброса по тикеру")
 		}
 	})
+}
+
+// --- Бенчмарки ---
+
+func BenchmarkSendToDelete(b *testing.B) {
+	testLogger := zap.NewNop().Sugar()
+	// Мок-функция, которая просто "поглощает" вызовы, чтобы воркер не блокировался
+	mockDeleter := func(ctx context.Context, appLogger *zap.SugaredLogger, userID string, shortIDs []string) error {
+		return nil
+	}
+
+	// Запускаем воркер один раз
+	Start(mockDeleter, testLogger)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	// Запускаем отправку в параллельных горутинах
+	b.RunParallel(func(pb *testing.PB) {
+		// Каждая горутина имеет свой уникальный userID
+		userID := fmt.Sprintf("bench-user-%d", time.Now().UnixNano())
+		for pb.Next() {
+			SendToDelete(userID, []string{"bench-id-1", "bench-id-2"})
+		}
+	})
+}
+
+func BenchmarkSoftDeleter_FlushBuffer(b *testing.B) {
+	testLogger := zap.NewNop().Sugar()
+	var wg sync.WaitGroup
+
+	// Мок-функция, которая сигнализирует о завершении
+	mockDeleter := func(ctx context.Context, appLogger *zap.SugaredLogger, userID string, shortIDs []string) error {
+		wg.Done()
+		return nil
+	}
+
+	Start(mockDeleter, testLogger)
+
+	// Создаем "пачку" из 25 задач (размер буфера)
+	tasks := make([]DeleteTask, 25)
+	for i := 0; i < 25; i++ {
+		tasks[i] = DeleteTask{
+			UserID:   fmt.Sprintf("bench-user-flush-%d", i),
+			ShortIDs: []string{"id-1"},
+		}
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Настраиваем WaitGroup на 25 вызовов (по 1 на пользователя)
+		b.StopTimer()
+		wg.Add(25)
+		b.StartTimer()
+
+		// Заполняем буфер
+		for _, task := range tasks {
+			SendToDelete(task.UserID, task.ShortIDs)
+		}
+
+		// Ждем, пока mockDeleter не будет вызван 25 раз
+		wg.Wait()
+	}
 }

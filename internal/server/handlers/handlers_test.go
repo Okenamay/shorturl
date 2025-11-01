@@ -328,3 +328,98 @@ func TestUserURLsHandler(t *testing.T) {
 		require.Equal(t, http.StatusNoContent, result.StatusCode)
 	})
 }
+
+// --- Бенчмарки ---
+
+func BenchmarkShortenHandler(b *testing.B) {
+	router := chi.NewRouter()
+	router.Post("/", ShortenHandler(Conf, TestLogger, nil))
+	newURLBody := []byte("https://new-url-for-bench.com/some/long/path")
+
+	b.Run("New URL", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			memstorage.Store = memstorage.NewURLMap()
+			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(newURLBody))
+			rr := httptest.NewRecorder()
+			b.StartTimer()
+
+			router.ServeHTTP(rr, req)
+		}
+	})
+}
+
+func BenchmarkRedirectHandler(b *testing.B) {
+	originalURL := "https://benchmark-redirect.com"
+	_, shortID := urlmaker.ProcessURL(Conf, originalURL)
+	memstorage.Store = memstorage.NewURLMap()
+	memstorage.Store.Set(shortID, originalURL)
+
+	router := chi.NewRouter()
+	// Оборачиваем в http.HandlerFunc, чтобы соответствовать chi.Router
+	router.Get("/{id}", http.HandlerFunc(RedirectHandler(Conf, TestLogger, nil)))
+
+	req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+	}
+}
+
+func BenchmarkUserURLsHandler(b *testing.B) {
+	router := chi.NewRouter()
+	router.Get("/api/user/urls", UserURLsHandler(Conf, TestLogger))
+
+	b.Run("Unauthorized", func(b *testing.B) {
+		req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+		}
+	})
+
+	b.Run("No Content", func(b *testing.B) {
+		ctx := context.WithValue(context.Background(), auth.UserIDContextKey, "bench-user-no-content")
+		req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		req = req.WithContext(ctx)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+		}
+	})
+}
+
+func BenchmarkBatchDeleter(b *testing.B) {
+	router := chi.NewRouter()
+	router.Delete("/api/user/urls", BatchDeleter(Conf))
+
+	shortIDs := []string{"a", "b", "c"}
+	body, _ := json.Marshal(shortIDs)
+	bodyBytes := body
+
+	ctx := context.WithValue(context.Background(), auth.UserIDContextKey, "bench-user-delete")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req := httptest.NewRequest(http.MethodDelete, "/api/user/urls", bytes.NewReader(bodyBytes))
+		req = req.WithContext(ctx)
+		rr := httptest.NewRecorder()
+
+		router.ServeHTTP(rr, req)
+
+		// Читаем из канала, чтобы он не блокировался (это необходимо для
+		// предотвращения блокировки)
+		<-worker.DeleteChan
+	}
+}
