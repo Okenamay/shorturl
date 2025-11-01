@@ -14,4 +14,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_urls ON public.urls (url, short_id);
 -- +goose StatementBegin
 DROP INDEX IF EXISTS public.idx_urls;
 DROP TABLE IF EXISTS public.urls;
--- +goose StatementBegin
+-- +goose StatementEnd
