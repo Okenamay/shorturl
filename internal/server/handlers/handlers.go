@@ -17,7 +17,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// Обработка запросов на сокращение URL:
+// ShortenHandler обрабатывает POST /
+// Принимает полный URL в виде text/plain в теле запроса.
+// Генерирует короткий URL, сохраняет его и возвращает в виде text/plain.
+//
+// Коды ответа:
+// 201 Created: Если URL успешно сокращен.
+// 400 Bad Request: Если URL в теле невалидный.
+// 409 Conflict: Если такой URL уже был сокращен ранее (возвращает
+// существующий короткий URL).
+// 500 Internal Server Error: При ошибках сохранения.
 func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("ShortenHandler started")
@@ -61,7 +70,17 @@ func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *aud
 	}
 }
 
-// Обработка запроса на переход по полному URL:
+// RedirectHandler обрабатывает GET /{id}
+// Принимает короткий ID из URL (e.g., /f47c4cAB).
+// Ищет ID в хранилище и, в случае успеха, перенаправляет (307 Temporary
+// Redirect) пользователя на оригинальный URL.
+//
+// Коды ответа:
+// 307 Temporary Redirect: В случае успеха.
+// 404 Not Found: Если ID имеет неверную длину.
+// 410 Gone: Если URL был удален.
+// 500 Internal Server Error: Если URL не найден в хранилище или произошла
+// ошибка.
 func RedirectHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("RedirectHandler started")

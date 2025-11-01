@@ -10,9 +10,27 @@ import (
 	"go.uber.org/zap"
 )
 
+// RequestEntry представляет одну запись в пакетном запросе на
+// /api/shorten/batch.
 type RequestEntry = memselect.RequestEntry
+
+// ResponseEntry представляет одну запись в пакетном ответе от
+// /api/shorten/batch.
 type ResponseEntry = memselect.ResponseEntry
 
+// BatchHandlerTransaction обрабатывает POST /api/shorten/batch
+// Принимает JSON-массив объектов вида:
+// [{"correlation_id": "id1", "original_url": "..."}, ...]
+//
+// Сокращает все URL в рамках *одной транзакции* (если используется БД).
+//
+// Возвращает JSON-массив объектов вида:
+// [{"correlation_id": "id1", "short_url": "..."}, ...]
+//
+// Коды ответа:
+// 201 Created: В случае успеха.
+// 400 Bad Request: Невалидный JSON.
+// 500 Internal Server Error: В случае ошибки обработки пакета или транзакции.
 func BatchHandlerTransaction(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("BatchHandlerTransaction started")

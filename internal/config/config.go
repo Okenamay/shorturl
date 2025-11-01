@@ -37,22 +37,23 @@ const (
 	audURL = ""
 )
 
-// Cfg определяет структуру конфигурации
+// Cfg определяет структуру конфигурации всего приложения.
+// Поля заполняются из командной строки (флаги) и переменных окружения.
 type Cfg struct {
-	ShortIDLen       int
-	IdleTimeout      int
-	ServerPort       string
-	ShortIDAddress   string
-	SaveFilePath     string
-	PostgreDSN       string
-	MemMode          string
-	MigrateID        string
-	MigrateDirection string
-	DBReinitialize   bool
-	AuthorizationKey string
-	TokenExpiry      int
-	AuditFile        string
-	AuditURL         string
+	ShortIDLen       int    // Длина генерируемого короткого URL
+	IdleTimeout      int    // Таймаут неактивности сервера
+	ServerPort       string // Адрес и порт для запуска сервера (e.g., ":8080")
+	ShortIDAddress   string // Базовый адрес для сокращенных URL (e.g., "http://localhost:8080")
+	SaveFilePath     string // Путь к файлу для хранения URL (если используется)
+	PostgreDSN       string // DSN для подключения к PostgreSQL
+	MemMode          string // Режим хранения ("postgres", "savefile", "memstore")
+	MigrateID        string // (Устарело, используется goose)
+	MigrateDirection string // (Устарело, используется goose)
+	DBReinitialize   bool   // Флаг, указывающий на необходимость запуска миграций
+	AuthorizationKey string // Секретный ключ для подписи JWT-токенов
+	TokenExpiry      int    // Срок жизни JWT-токена в часах
+	AuditFile        string // Путь к файлу для логов аудита
+	AuditURL         string // URL для отправки логов аудита
 }
 
 func parseFlags() *Cfg {
