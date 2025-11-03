@@ -37,3 +37,5 @@ func main() {
 
 	defer appLogger.Sync()
 }
+
+// Затравка для 20 инкремента.
