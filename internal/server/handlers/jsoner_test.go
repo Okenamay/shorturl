@@ -114,3 +114,48 @@ func TestJSONHandler(t *testing.T) {
 		})
 	}
 }
+
+// --- Бенчмарки ---
+
+func BenchmarkJSONHandler(b *testing.B) {
+	router := chi.NewRouter()
+	router.Post("/api/shorten", JSONHandler(Conf, TestLogger, nil))
+
+	newURLBody, _ := json.Marshal(JSONRequest{URL: "https://new-url-for-bench.com"})
+	newURLBytes := newURLBody
+
+	// Готовим тело для конфликтующего URL
+	conflictURL := "https://existing-url-for-bench.com"
+	conflictBody, _ := json.Marshal(JSONRequest{URL: conflictURL})
+	conflictURLBytes := conflictBody
+
+	b.Run("New URL", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			memstorage.Store = memstorage.NewURLMap()
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(newURLBytes))
+			rr := httptest.NewRecorder()
+			b.StartTimer()
+
+			router.ServeHTTP(rr, req)
+		}
+	})
+
+	b.Run("Conflict URL", func(b *testing.B) {
+		memstorage.Store = memstorage.NewURLMap()
+		_, shortID := urlmaker.ProcessURL(Conf, conflictURL)
+		memstorage.Store.Set(shortID, conflictURL)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// Не нужно сбрасывать хранилище, т.к. мы тестируем конфликт
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(conflictURLBytes))
+			rr := httptest.NewRecorder()
+
+			router.ServeHTTP(rr, req)
+		}
+	})
+}

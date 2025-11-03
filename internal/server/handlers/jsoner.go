@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 
@@ -31,18 +30,12 @@ func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.
 		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		var request JSONRequest
-		var buf bytes.Buffer
 
-		_, err := buf.ReadFrom(r.Body)
-		if err != nil {
-			appLogger.Errorw("JSONHandler stopped - read body FAIL", "error", err)
-			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if err = json.Unmarshal(buf.Bytes(), &request); err != nil {
-			appLogger.Errorw("JSONHandler stopped - JSON unmarshal FAIL", "Error", err)
-			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)
+		// Изменение: перешёл на потоковый декодер, убрал bytes.Buffer и
+		// buf.ReadFrom
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			appLogger.Errorw("JSONHandler stopped - JSON decode FAIL", "Error", err)
+			http.Error(w, emsg.ErrorServer.Error(), http.StatusBadRequest) // Ошибка клиента
 			return
 		}
 
@@ -69,20 +62,19 @@ func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.
 			Result: newURL,
 		}
 
-		data, err := json.Marshal(response)
-		if err != nil {
-			appLogger.Errorw("JSONHandler stopped - JSON marshal FAIL", "error", err)
-			http.Error(w, emsg.ErrorServer.Error(), http.StatusInternalServerError)
-			return
-		}
-
+		// Изменение: Используем потоковый энкодер
 		w.Header().Set("content-type", "application/json")
 		if exists {
 			w.WriteHeader(http.StatusConflict)
 		} else {
 			w.WriteHeader(http.StatusCreated)
 		}
-		w.Write(data)
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			appLogger.Errorw("JSONHandler stopped - JSON encode FAIL", "error", err)
+			return
+		}
+
 		appLogger.Info("JSONHandler finished")
 	}
 }

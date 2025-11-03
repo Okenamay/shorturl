@@ -63,26 +63,29 @@ func TestCompressorMiddleware(t *testing.T) {
 		wantCompressed       bool
 	}{
 		{
-			name:                 "Gzip accepted, valid Content-Type (json)",
+			name:                 "Gzip accepted, Content-Type (json)",
 			acceptEncodingHeader: "gzip",
 			contentType:          "application/json",
 			wantCompressed:       true,
 		},
 		{
-			name:                 "Gzip accepted, valid Content-Type (html)",
+			name:                 "Gzip accepted, Content-Type (html)",
 			acceptEncodingHeader: "gzip",
 			contentType:          "text/html; charset=utf-8",
 			wantCompressed:       true,
 		},
 		{
-			name:                 "Gzip accepted, invalid Content-Type (text/plain)",
+			// Изменение:
+			// Новая потоковая логика сжимает ЛЮБОЙ Content-Type, если клиент
+			// принимает gzip.
+			name:                 "Gzip accepted, any Content-Type (text/plain)",
 			acceptEncodingHeader: "gzip",
 			contentType:          "text/plain",
-			wantCompressed:       false,
+			wantCompressed:       true,
 		},
 		{
 			name:                 "Gzip NOT accepted",
-			acceptEncodingHeader: "identity", // "identity" - это без сжатия
+			acceptEncodingHeader: "identity", // без сжатия
 			contentType:          "application/json",
 			wantCompressed:       false,
 		},
@@ -124,7 +127,7 @@ func TestDecompressorMiddleware(t *testing.T) {
 	testLogger := zap.NewNop().Sugar()
 	const requestBody = `{"ping": "pong"}`
 
-	// nextHandler - это "эхо-сервер", который читает тело запроса и пишет его
+	// nextHandler - это эхо-сервер, который читает тело запроса и пишет его
 	// в тело ответа. Если декомпрессия успешна, он вернет распакованное тело
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -172,4 +175,49 @@ func TestDecompressorMiddleware(t *testing.T) {
 		// gzip.NewReader вернет ошибку, и middleware должен вернуть 500
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
+}
+
+// --- Бенчмарки ---
+
+var (
+	benchLogger      = zap.NewNop().Sugar()
+	benchCompressReq = func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		return req
+	}()
+	benchDecompressReqBody = mustCompress(&testing.T{}, `{"field_one": "value_one", "field_two": "value_two"}`)
+)
+
+func BenchmarkCompressorMiddleware(b *testing.B) {
+	handler := Compressor(benchLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"field_one": "value_one", "field_two": "value_two"}`))
+	}))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, benchCompressReq)
+	}
+}
+
+func BenchmarkDecompressorMiddleware(b *testing.B) {
+	handler := Decompressor(benchLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Читаем тело, чтобы r.Body был полностью обработан
+		io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Необходимо создать новый ридер для тела, т.к. оно читается 1 раз
+		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(benchDecompressReqBody.Bytes()))
+		req.Header.Set("Content-Encoding", "gzip")
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+	}
 }

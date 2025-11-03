@@ -77,3 +77,35 @@ func TestCheckURL(t *testing.T) {
 		})
 	}
 }
+
+// --- Бенчмарки ---
+
+var (
+	benchLogger = zap.NewNop().Sugar()
+	// Используем result, чтобы компилятор не оптимизировал вызов
+	benchResult, _ = CheckURL("https://google.com", benchLogger)
+)
+
+func BenchmarkCheckURL_Valid(b *testing.B) {
+	rawURL := "https://google.com/search?q=test&param=value"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchResult, _ = CheckURL(rawURL, benchLogger)
+	}
+}
+
+func BenchmarkCheckURL_InvalidScheme(b *testing.B) {
+	rawURL := "ftp://example.com"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchResult, _ = CheckURL(rawURL, benchLogger)
+	}
+}
+
+func BenchmarkCheckURL_InvalidParse(b *testing.B) {
+	rawURL := "not a valid url string at all"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchResult, _ = CheckURL(rawURL, benchLogger)
+	}
+}

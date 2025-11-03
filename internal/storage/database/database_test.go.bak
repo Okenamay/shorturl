@@ -1,0 +1,226 @@
+// package database
+
+// import (
+// 	"errors"
+// 	"fmt"
+// 	"regexp"
+// 	"testing"
+
+// 	"github.com/Okenamay/shorturl.git/internal/config"
+// 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
+// 	"github.com/pashagolub/pgxmock/v3"
+// 	"github.com/stretchr/testify/assert"
+// 	"github.com/stretchr/testify/require"
+// 	"go.uber.org/zap"
+// )
+
+// // setupMockAndLogger создает мок DBPool и логгер-пустышку для тестов.
+// func setupMockAndLogger(t *testing.T) (pgxmock.PgxPoolIface, *zap.SugaredLogger) {
+// 	mock, err := pgxmock.NewPool()
+// 	require.NoError(t, err)
+
+// 	// Устанавливаем наш мок в глобальную переменную DBPool
+// 	// В реальном приложении лучше избегать глобальных переменных,
+// 	// но для теста существующего кода мы вынуждены это сделать.
+// 	DBPool = mock
+
+// 	// Сбрасываем memstorage перед каждым тестом
+// 	memstorage.Store = memstorage.NewURLMap()
+
+// 	logger := zap.NewNop().Sugar()
+
+// 	// Убедимся, что DBPool очищается после теста
+// 	t.Cleanup(func() {
+// 		DBPool.Close()
+// 		DBPool = nil
+// 		memstorage.Store = memstorage.NewURLMap()
+// 	})
+
+// 	return mock, logger
+// }
+
+// func TestStartDB(t *testing.T) {
+// 	conf := &config.Cfg{
+// 		PostgreDSN:     "fake-dsn", // Не используется pgxmock, но нужен для функции
+// 		DBReinitialize: false,
+// 		ShortIDLen:     8, // Для DBReinit
+// 	}
+
+// 	t.Run("Successful start and load", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+
+// 		// 1. Ожидаем Query для загрузки данных
+// 		rows := pgxmock.NewRows([]string{"url", "short_id"}).
+// 			AddRow("https://google.com", "ggl123").
+// 			AddRow("https://yandex.ru", "yndx456")
+// 		mock.ExpectQuery("SELECT url, short_id FROM urls").WillReturnRows(rows)
+
+// 		err := StartDB(conf, logger)
+// 		require.NoError(t, err)
+
+// 		// 2. Проверяем, что memstorage загрузился
+// 		allData := memstorage.Store.GetAll()
+// 		assert.Len(t, allData, 2)
+// 		assert.Equal(t, "https://google.com", allData["ggl123"])
+
+// 		// 3. Убедимся, что все ожидания мока выполнены
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("StartDB with reinitialization", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+// 		reinitConf := &config.Cfg{
+// 			PostgreDSN:     "fake-dsn",
+// 			DBReinitialize: true, // Включаем reinit
+// 			ShortIDLen:     8,
+// 		}
+
+// 		// 1. Ожидаем Exec для DBReinit
+// 		sqlReinit := fmt.Sprintf(`
+// 	CREATE TABLE IF NOT EXISTS urls (
+// 		id BIGSERIAL PRIMARY KEY,
+// 		user_id VARCHAR(36),
+// 		url VARCHAR(1024) UNIQUE,
+// 		short_id VARCHAR(%d) UNIQUE,
+// 		del_flag BOOLEAN DEFAULT false
+// 	);
+// 	`, reinitConf.ShortIDLen)
+// 		mock.ExpectExec(regexp.QuoteMeta(sqlReinit)).WillReturnResult(pgxmock.NewResult("CREATE TABLE", 1))
+
+// 		// 2. Ожидаем Query для загрузки (возвращаем пустые строки)
+// 		rows := pgxmock.NewRows([]string{"url", "short_id"})
+// 		mock.ExpectQuery("SELECT url, short_id FROM urls").WillReturnRows(rows)
+
+// 		err := StartDB(reinitConf, logger)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("StartDB query error", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+
+// 		// 1. Ожидаем Query, который вернет ошибку
+// 		mock.ExpectQuery("SELECT url, short_id FROM urls").WillReturnError(errors.New("db query error"))
+
+// 		err := StartDB(conf, logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "db query error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("StartDB scan error", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+
+// 		// 1. Ожидаем Query, который вернет строки с неверным типом
+// 		rows := pgxmock.NewRows([]string{"url", "short_id"}).
+// 			AddRow(123, "ggl123") // 123 - не строка, вызовет Scan error
+// 		mock.ExpectQuery("SELECT url, short_id FROM urls").WillReturnRows(rows)
+
+// 		err := StartDB(conf, logger)
+// 		require.Error(t, err) // Ошибка Scan
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+// }
+
+// func TestStopDB(t *testing.T) {
+// 	t.Run("StopDB closes pool", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+// 		mock.ExpectClose() // Ожидаем, что DBPool.Close() будет вызван
+
+// 		StopDB(logger)
+
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("StopDB does nothing if pool is nil", func(t *testing.T) {
+// 		logger := zap.NewNop().Sugar()
+// 		DBPool = nil // Явно устанавливаем в nil
+
+// 		// Ошибки не должно быть
+// 		StopDB(logger)
+// 	})
+// }
+
+// func TestDBPing(t *testing.T) {
+// 	t.Run("Successful ping", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+// 		mock.ExpectPing() // Ожидаем Ping
+
+// 		err := DBPing(logger)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Failed ping", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+// 		mock.ExpectPing().WillReturnError(errors.New("connection failed"))
+
+// 		err := DBPing(logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "connection failed")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Ping with nil pool", func(t *testing.T) {
+// 		logger := zap.NewNop().Sugar()
+// 		DBPool = nil
+
+// 		err := DBPing(logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "DBPing. DB pool not initialized")
+// 	})
+// }
+
+// func TestDBReinit(t *testing.T) {
+// 	conf := &config.Cfg{ShortIDLen: 8}
+
+// 	t.Run("Successful reinit", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+
+// 		sql := fmt.Sprintf(`
+// 	CREATE TABLE IF NOT EXISTS urls (
+// 		id BIGSERIAL PRIMARY KEY,
+// 		user_id VARCHAR(36),
+// 		url VARCHAR(1024) UNIQUE,
+// 		short_id VARCHAR(%d) UNIQUE,
+// 		del_flag BOOLEAN DEFAULT false
+// 	);
+// 	`, conf.ShortIDLen)
+
+// 		mock.ExpectExec(regexp.QuoteMeta(sql)).WillReturnResult(pgxmock.NewResult("CREATE TABLE", 1))
+
+// 		err := DBReinit(conf, logger)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Failed reinit", func(t *testing.T) {
+// 		mock, logger := setupMockAndLogger(t)
+
+// 		sql := fmt.Sprintf(`
+// 	CREATE TABLE IF NOT EXISTS urls (
+// 		id BIGSERIAL PRIMARY KEY,
+// 		user_id VARCHAR(36),
+// 		url VARCHAR(1024) UNIQUE,
+// 		short_id VARCHAR(%d) UNIQUE,
+// 		del_flag BOOLEAN DEFAULT false
+// 	);
+// 	`, conf.ShortIDLen)
+
+// 		mock.ExpectExec(regexp.QuoteMeta(sql)).WillReturnError(errors.New("syntax error"))
+
+// 		err := DBReinit(conf, logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "syntax error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Reinit with nil pool", func(t *testing.T) {
+// 		logger := zap.NewNop().Sugar()
+// 		DBPool = nil
+
+// 		err := DBReinit(conf, logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "DBReinit. DB pool is not initialized")
+// 	})
+// }
