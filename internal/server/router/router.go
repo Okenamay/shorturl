@@ -14,7 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Запуск HTTP-сервера и работа с запросами:
+// Launch запускает HTTP-сервер на основе предоставленной конфигурации.
+// Эта функция блокирует выполнение до тех пор, пока сервер не будет остановлен.
 func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) error {
 	router := NewRouter(conf, appLogger, auditor)
 
@@ -32,6 +33,8 @@ func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Audit
 	return nil
 }
 
+// NewRouter создает новый экземпляр роутера (http.Handler) с настроенными
+// middleware и всеми эндпоинтами приложения.
 func NewRouter(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.Handler {
 	router := chi.NewRouter()
 

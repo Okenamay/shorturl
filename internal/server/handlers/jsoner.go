@@ -14,15 +14,29 @@ import (
 	"go.uber.org/zap"
 )
 
+// JSONRequest - структура для входящего JSON-запроса на /api/shorten.
 type JSONRequest struct {
 	URL string `json:"url"`
 }
 
+// JSONResponse - структура для исходящего JSON-ответа от /api/shorten.
 type JSONResponse struct {
 	Result string `json:"result"`
 }
 
-// Обработка запроса на переход по JSON-запросу:
+// JSONHandler обрабатывает POST /api/shorten
+// Принимает JSON-объект вида {"url": "..."} в теле запроса.
+// Генерирует короткий URL, сохраняет его и возвращает в виде JSON-объекта
+// {"result": "..."}.
+//
+// Эта реализация использует потоковые json.Decoder и json.Encoder для
+// минимизации аллокаций памяти (не буферизует тело запроса/ответа).
+//
+// Коды ответа:
+// 201 Created: Если URL успешно сокращен.
+// 400 Bad Request: Если URL в теле невалидный или JSON некорректен.
+// 409 Conflict: Если такой URL уже был сокращен ранее.
+// 500 Internal Server Error: При ошибках сохранения.
 func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("JSONHandler started")
@@ -31,11 +45,9 @@ func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.
 
 		var request JSONRequest
 
-		// Изменение: перешёл на потоковый декодер, убрал bytes.Buffer и
-		// buf.ReadFrom
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			appLogger.Errorw("JSONHandler stopped - JSON decode FAIL", "Error", err)
-			http.Error(w, emsg.ErrorServer.Error(), http.StatusBadRequest) // Ошибка клиента
+			http.Error(w, emsg.ErrorServer.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -62,7 +74,6 @@ func JSONHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.
 			Result: newURL,
 		}
 
-		// Изменение: Используем потоковый энкодер
 		w.Header().Set("content-type", "application/json")
 		if exists {
 			w.WriteHeader(http.StatusConflict)

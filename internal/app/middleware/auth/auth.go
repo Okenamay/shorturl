@@ -55,8 +55,22 @@ func getUserID(conf *config.Cfg, tokenString string) (string, error) {
 
 type contextKey string
 
+// UserIDContextKey - это ключ, используемый для хранения ID пользователя в
+// context.Context запроса.
 const UserIDContextKey = contextKey("userID")
 
+// Authenticator - это middleware, которое управляет аутентификацией
+// пользователя. Если у пользователя нет "token" cookie:
+// 1. Генерируется новый UUID пользователя.
+// 2. Создается новый JWT-токен.
+// 3. Токен устанавливается в "token" cookie.
+// 4. UUID пользователя добавляется в контекст запроса.
+//
+// Если "token" cookie есть:
+// 1. Токен валидируется.
+// 2. В случае успеха, UserID из токена добавляется в контекст запроса.
+// 3. В случае неудачи (неверная подпись, истекший срок), возвращается 401
+// Unauthorized.
 func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +110,10 @@ func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 	}
 }
 
+// CheckAuth - вспомогательная функция для извлечения ID пользователя из
+// context.Context запроса.
+// Возвращает ID пользователя и true, если он был найден и аутентифицирован.
+// Возвращает пустую строку и false, если пользователь не аутентифицирован.
 func CheckAuth(r *http.Request) (string, bool) {
 	userID, ok := r.Context().Value(UserIDContextKey).(string)
 	if !ok || userID == "" {

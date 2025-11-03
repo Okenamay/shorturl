@@ -8,7 +8,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// PingHandler проверяет соединение с базой данных и отвечает на пинг:
+// PingHandler обрабатывает GET /ping
+// Используется для проверки доступности хранилища (PostgreSQL).
+//
+// Коды ответа:
+// 200 OK: Если подключение к БД успешно.
+// 500 Internal Server Error: Если БД недоступна или (для memstore/savefile)
+// если режим работы не "postgres".
 func PingHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		appLogger.Info("PingHandler started")
