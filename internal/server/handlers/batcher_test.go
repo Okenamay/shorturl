@@ -45,7 +45,7 @@ func TestBatchHandlerTransaction(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.Post("/api/shorten/batch", BatchHandlerTransaction(Conf))
+	router.Post("/api/shorten/batch", BatchHandlerTransaction(Conf, TestLogger))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -83,7 +83,7 @@ func TestJSONHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.Post("/api/shorten", JSONHandler(Conf))
+	router.Post("/api/shorten", JSONHandler(Conf, TestLogger, nil))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

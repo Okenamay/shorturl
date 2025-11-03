@@ -4,24 +4,28 @@ import (
 	"context"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
+	"go.uber.org/zap"
 )
 
-func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg) error {
-	logger.Zap.Info("MigrateLauncher. Start")
+type DBExecutor interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+}
+
+func MigrateLauncher(ctx context.Context, dbpool DBExecutor, conf *config.Cfg, appLogger *zap.SugaredLogger) error {
+	appLogger.Info("MigrateLauncher started")
 
 	if conf.MigrateID == "" {
-		logger.Zap.Info("Migration disabled. Skipping.")
+		appLogger.Warn("MigrateLauncher stopped - migration disabled")
 		return nil
 	}
 
-	logger.Zap.Infof("Attempting migration for ID: %s, direction: %s",
+	appLogger.Infof("MigrateLauncher - attempting migration for ID: %s, direction: %s",
 		conf.MigrateID, conf.MigrateDirection)
 
 	migration := DeliverMigration(conf)
 	if migration.ID == "" {
-		logger.Zap.Infof("Unknown migration ID: %s", conf.MigrateID)
+		appLogger.Warnf("MigrateLauncher stopped - unknown migration ID: %s", conf.MigrateID)
 		return nil
 	}
 
@@ -29,24 +33,23 @@ func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg
 	case "up":
 		_, err := dbpool.Exec(ctx, migration.UpSQL)
 		if err != nil {
-			logger.Zap.Errorf("Migration ID: %s failed: %v", migration.ID, err)
+			appLogger.Errorf("MigrateLauncher stopped - migration ID: %s FAIL", migration.ID, "error", err)
 			return err
 		}
 
-		logger.Zap.Infof("Successfully applied migration: %s", migration.ID)
+		appLogger.Infof("MigrateLauncher finished - migration: %s OK", migration.ID)
 		return nil
 	case "down":
 		_, err := dbpool.Exec(ctx, migration.DownSQL)
 		if err != nil {
-			logger.Zap.Errorf("Rollback ID: %s failed: %v", migration.ID, err)
+			appLogger.Errorf("MigrateLauncher stopped - rollback ID: %s FAIL", migration.ID, "error", err)
 			return err
 		}
 
-		logger.Zap.Infof("Successfully applied rollback: %s", migration.ID)
+		appLogger.Infof("MigrateLauncher finished - applied rollback: %s OK", migration.ID)
 		return nil
 	default:
-		logger.Zap.Infof("Incorrect migration direction: %s", conf.MigrateDirection)
+		appLogger.Warnf("MigrateLauncher finished - incorrect migration direction: %s", conf.MigrateDirection)
 		return nil
 	}
-
 }

@@ -7,17 +7,14 @@ import (
 	"go.uber.org/zap"
 )
 
-var Zap *zap.SugaredLogger
-
-func InitLogger() error {
-	logger, err := zap.NewProduction()
+// InitLogger инициализирует и возвращает новый экземпляр логгера, глобальная
+// переменная Zap больше не используется
+func InitLogger() (*zap.SugaredLogger, error) {
+	appLogger, err := zap.NewProduction()
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	Zap = logger.Sugar()
-
-	return nil
+	return appLogger.Sugar(), nil
 }
 
 type (
@@ -25,7 +22,6 @@ type (
 		status int
 		size   int
 	}
-
 	loggingResponseWriter struct {
 		http.ResponseWriter
 		responseData *responseData
@@ -43,32 +39,92 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
-// Middleware для логирования запросов и ответов
-func WithLogging(h http.Handler) http.Handler {
-	logFn := func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+// WithLogging - middleware для логиррования HTTP запросов
+func WithLogging(appLogger *zap.SugaredLogger) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			responseData := &responseData{status: 0, size: 0}
+			lw := loggingResponseWriter{
+				ResponseWriter: w,
+				responseData:   responseData,
+			}
+			h.ServeHTTP(&lw, r)
+			duration := time.Since(start)
 
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-
-		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-
-		h.ServeHTTP(&lw, r)
-
-		duration := time.Since(start)
-		Zap.Infoln(
-			"uri", r.RequestURI,
-			"method", r.Method,
-			"status", responseData.status,
-			"duration", duration,
-			"size", responseData.size,
-		)
+			appLogger.Infow("Request handled",
+				"uri", r.RequestURI,
+				"method", r.Method,
+				"status", responseData.status,
+				"duration", duration,
+				"size", responseData.size,
+			)
+		})
 	}
-
-	return http.HandlerFunc(logFn)
 }
+
+// var Zap *zap.SugaredLogger
+
+// func InitLogger() error {
+// 	logger, err := zap.NewProduction()
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	Zap = logger.Sugar()
+
+// 	return nil
+// }
+
+// type (
+// 	responseData struct {
+// 		status int
+// 		size   int
+// 	}
+
+// 	loggingResponseWriter struct {
+// 		http.ResponseWriter
+// 		responseData *responseData
+// 	}
+// )
+
+// func (r *loggingResponseWriter) Write(b []byte) (int, error) {
+// 	size, err := r.ResponseWriter.Write(b)
+// 	r.responseData.size += size
+// 	return size, err
+// }
+
+// func (r *loggingResponseWriter) WriteHeader(statusCode int) {
+// 	r.ResponseWriter.WriteHeader(statusCode)
+// 	r.responseData.status = statusCode
+// }
+
+// // Middleware для логирования запросов и ответов
+// func WithLogging(h http.Handler) http.Handler {
+// 	logFn := func(w http.ResponseWriter, r *http.Request) {
+// 		start := time.Now()
+
+// 		responseData := &responseData{
+// 			status: 0,
+// 			size:   0,
+// 		}
+
+// 		lw := loggingResponseWriter{
+// 			ResponseWriter: w,
+// 			responseData:   responseData,
+// 		}
+
+// 		h.ServeHTTP(&lw, r)
+
+// 		duration := time.Since(start)
+// 		Zap.Infoln(
+// 			"uri", r.RequestURI,
+// 			"method", r.Method,
+// 			"status", responseData.status,
+// 			"duration", duration,
+// 			"size", responseData.size,
+// 		)
+// 	}
+
+// 	return http.HandlerFunc(logFn)
+// }

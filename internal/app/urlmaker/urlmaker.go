@@ -7,7 +7,7 @@ import (
 
 // Составление строки с сокращённым URL:
 func MakeFullURL(conf *config.Cfg, shortID string) string {
-	newURL := conf.ShortIDServerPort + "/" + shortID
+	newURL := conf.ShortIDAddress + "/" + shortID
 
 	return newURL
 }

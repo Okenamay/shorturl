@@ -4,31 +4,30 @@ import (
 	"net/http"
 
 	"github.com/Okenamay/shorturl.git/internal/config"
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
+	"go.uber.org/zap"
 )
 
 // PingHandler проверяет соединение с базой данных и отвечает на пинг:
-func PingHandler(conf *config.Cfg) http.HandlerFunc {
+func PingHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Zap.Info("PingHandler. Start")
+		appLogger.Info("PingHandler started")
 
-		err, pingOK := memselect.PingDB(conf)
+		err, pingOK := memselect.PingDB(conf, appLogger)
 		if err != nil {
-			logger.Zap.Errorw("PingHandler. DB ping error", "error", err)
+			appLogger.Errorw("PingHandler stopped - DB ping FAIL", "error", err)
 			http.Error(w, "Database connection error", http.StatusInternalServerError)
 			return
-		} else {
-			logger.Zap.Info("PingHandler. DB ping success")
 		}
 
 		if !pingOK {
-			logger.Zap.Infof("PingHandler: DB not configured for ping. MemMode: %s.",
+			appLogger.Warnf("PingHandler stopped - DB not configured for ping. MemMode: %s",
 				conf.MemMode)
 			http.Error(w, "Database not enabled", http.StatusInternalServerError)
 			return
 		}
 
+		appLogger.Info("PingHandler finished - DB ping OK")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("PONG"))
 	}

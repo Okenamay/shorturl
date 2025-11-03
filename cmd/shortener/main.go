@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/server/router"
@@ -9,26 +10,30 @@ import (
 )
 
 func main() {
-	if err := logger.InitLogger(); err != nil {
-		logger.Zap.Fatalw(err.Error(), "Main", "Start logger")
+	appLogger, err := logger.InitLogger()
+	if err != nil {
+		// Если логгер не стартовал, мы не можем даже это залогировать. Паникуем.
+		panic("failed to initialize logger: " + err.Error())
 	}
+	defer appLogger.Sync()
 
 	conf := config.InitConfig()
+	auditor := audit.NewAuditor(conf.AuditFile, conf.AuditURL, appLogger)
 
-	worker.Start(memselect.BatchDelete)
+	worker.Start(memselect.BatchDelete, appLogger)
 
-	err := memselect.MemInit(conf)
+	err = memselect.MemInit(conf, appLogger)
 	if err != nil {
-		logger.Zap.Errorw(err.Error(), "Main", "Initialize storage")
+		appLogger.Errorw(err.Error(), "Main", "Initialize storage")
 	}
-	defer memselect.MemStop(conf)
+	defer memselect.MemStop(conf, appLogger)
 
-	logger.Zap.Infof("Starting server on port: %s", conf.ServerPort)
+	appLogger.Infof("Starting server on port: %s", conf.ServerPort)
 
-	err = router.Launch(conf)
+	err = router.Launch(conf, appLogger, auditor)
 	if err != nil {
-		logger.Zap.Fatalw(err.Error(), "Main", "Start server")
+		appLogger.Fatalw(err.Error(), "Main", "Start server")
 	}
 
-	defer logger.Zap.Sync()
+	defer appLogger.Sync()
 }

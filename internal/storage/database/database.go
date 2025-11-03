@@ -7,29 +7,29 @@ import (
 
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
 	"github.com/Okenamay/shorturl.git/internal/config"
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
-func DeleteFlaggedURLs(ctx context.Context) error {
-	logger.Zap.Info("Running scheduled deletion of flagged URLs")
+func DeleteFlaggedURLs(ctx context.Context, appLogger *zap.SugaredLogger) error {
+	appLogger.Info("DeleteFlaggedURLs starting")
 	if DBPool == nil {
 		return fmt.Errorf("database pool is not initialized")
 	}
 
 	res, err := DBPool.Exec(ctx, "DELETE FROM urls WHERE del_flag = true")
 	if err != nil {
-		logger.Zap.Errorw("Failed to delete flagged URLs", "error", err)
+		appLogger.Errorw("DeleteFlaggedURLs stopped - delete flagged URLs FAIL", "error", err)
 		return err
 	}
 
 	rowsAffected := res.RowsAffected()
 	if rowsAffected > 0 {
-		logger.Zap.Infof("Successfully deleted %d flagged URLs", rowsAffected)
+		appLogger.Infof("DeleteFlaggedURLs - deleted %d flagged URLs OK", rowsAffected)
 	} else {
-		logger.Zap.Info("No flagged URLs to delete")
+		appLogger.Warn("DeleteFlaggedURLs - no flagged URLs to delete")
 	}
 
 	return nil
@@ -45,8 +45,8 @@ type URLInfo struct {
 	IsDeleted   bool
 }
 
-func DBReinit(conf *config.Cfg) error {
-	logger.Zap.Info("DBReinit. Start")
+func DBReinit(conf *config.Cfg, appLogger *zap.SugaredLogger) error {
+	appLogger.Info("DBReinit started")
 
 	sql := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS urls (
@@ -59,17 +59,17 @@ func DBReinit(conf *config.Cfg) error {
 	`, conf.ShortIDLen)
 
 	if DBPool == nil {
-		logger.Zap.Error("DBReinit. DB pool not initialized")
+		appLogger.Errorw("DBReinit stopped - DB pool init FAIL", "error")
 		return fmt.Errorf("DBReinit. DB pool is not initialized")
 	}
 
 	_, err := DBPool.Exec(context.Background(), sql)
 	if err != nil {
-		logger.Zap.Errorf("DBReinit. Failed to create table: %w", err)
+		appLogger.Errorw("DBReinit stopped - create table FAIL", "error", err)
 		return err
 	}
 
-	logger.Zap.Info("DBReinit. Table created or already exists")
+	appLogger.Info("DBReinit finished - table created or already exists")
 	return nil
 }
 
@@ -86,7 +86,7 @@ func GetURLInfo(shortID string) (URLInfo, error) {
 	return info, nil
 }
 
-func BatchDelete(ctx context.Context, userID string, shortIDs []string) error {
+func BatchDelete(ctx context.Context, appLogger *zap.SugaredLogger, userID string, shortIDs []string) error {
 	tx, err := DBPool.Begin(ctx)
 	if err != nil {
 		return err
@@ -108,41 +108,41 @@ func BatchDelete(ctx context.Context, userID string, shortIDs []string) error {
 	for range shortIDs {
 		_, err := results.Exec()
 		if err != nil {
-			logger.Zap.Errorw("BatchDelete. Error in batch execution", "error", err)
+			appLogger.Errorw("BatchDelete. Error in batch execution", "error", err)
 		}
 	}
 
 	if closeErr := results.Close(); closeErr != nil {
-		logger.Zap.Errorw("BatchDelete. Error closing batch results", "error", closeErr)
+		appLogger.Errorw("BatchDelete. Error closing batch results", "error", closeErr)
 		return closeErr
 	}
 
 	return tx.Commit(ctx)
 }
 
-func StartDB(conf *config.Cfg) error {
-	logger.Zap.Info("StartDB. Start")
+func StartDB(conf *config.Cfg, appLogger *zap.SugaredLogger) error {
+	appLogger.Info("StartDB started")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	DBPool, err = pgxpool.New(ctx, conf.PostgreDSN)
 	if err != nil {
-		logger.Zap.Errorw("StartDB. Failed to connect pgxpool", "error", err)
+		appLogger.Errorw("StartDB - connect pgxpool FAIL", "error", err)
 		return err
 	}
 
-	logger.Zap.Info("StartDB. Pool initialized.")
+	appLogger.Info("StartDB - pool init OK")
 
 	if conf.DBReinitialize {
-		if err := DBReinit(conf); err != nil {
+		if err := DBReinit(conf, appLogger); err != nil {
 			return err
 		}
 	}
 
 	rows, err := DBPool.Query(context.Background(), "SELECT url, short_id FROM urls")
 	if err != nil {
-		logger.Zap.Errorw("StartDB. Failed to read table", "error", err)
+		appLogger.Errorw("StartDB stopped - read table FAIL", "error", err)
 		return err
 	}
 	defer rows.Close()
@@ -150,7 +150,7 @@ func StartDB(conf *config.Cfg) error {
 	for rows.Next() {
 		var fullURL, shortID string
 		if err := rows.Scan(&fullURL, &shortID); err != nil {
-			logger.Zap.Errorw("StartDB. Failed to scan row", "error", err)
+			appLogger.Errorw("StartDB stopped - row scan FAIL", "error", err)
 			return err
 		}
 
@@ -158,44 +158,44 @@ func StartDB(conf *config.Cfg) error {
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.Zap.Errorf("StartDB. Failed to iterate rows: %w", err)
+		appLogger.Errorw("StartDB stopped - iterate rows FAIL", "error", err)
 		return err
 	}
 
-	logger.Zap.Infof("StartDB. Loaded %d records into memory", len(memstorage.Store.GetAll()))
+	appLogger.Infof("StartDB finished - loaded %d records into memory", len(memstorage.Store.GetAll()))
 
 	return nil
 }
 
-func StopDB() {
+func StopDB(appLogger *zap.SugaredLogger) {
 	if DBPool != nil {
 		DBPool.Close()
-		logger.Zap.Info("StopDB. Database connection pool closed.")
+		appLogger.Info("StopDB finished - DB connection pool closed")
 	}
 }
 
-func DBPing() error {
-	logger.Zap.Info("DBPing. Start")
+func DBPing(appLogger *zap.SugaredLogger) error {
+	appLogger.Info("DBPing started")
 
 	if DBPool == nil {
-		logger.Zap.Error("DBPing. DB pool not initialized")
+		appLogger.Error("DBPing stopped - DB pool not initialized")
 		return fmt.Errorf("DBPing. DB pool not initialized")
 	}
 
 	err := DBPool.Ping(context.Background())
 	if err != nil {
-		logger.Zap.Errorw("DBPing. DB ping error", "error", err)
+		appLogger.Errorw("DBPing stopped - DB ping FAIL", "error", err)
 		return err
 	}
 
 	return nil
 }
 
-func AddOne(conf *config.Cfg, userID, shortID, fullURL string) (bool, error) {
-	logger.Zap.Info("AddOne. Start")
+func AddOne(conf *config.Cfg, appLogger *zap.SugaredLogger, userID, shortID, fullURL string) (bool, error) {
+	appLogger.Info("AddOne started")
 
 	if DBPool == nil {
-		logger.Zap.Error("AddOne. DB pool is not initialized")
+		appLogger.Error("AddOne stopped - DB pool not initialized")
 		return false, fmt.Errorf("AddOne. DB pool is not initialized")
 	}
 
@@ -203,11 +203,11 @@ func AddOne(conf *config.Cfg, userID, shortID, fullURL string) (bool, error) {
 	err := DBPool.QueryRow(context.Background(),
 		"SELECT EXISTS (SELECT 1 FROM urls WHERE url = $1)", fullURL).Scan(&exists)
 	if err != nil {
-		logger.Zap.Errorw("AddOne. DB entry check error", "error", err)
+		appLogger.Errorw("AddOne stopped - DB entry check FAIL", "error", err)
 		return false, err
 	}
 	if exists {
-		logger.Zap.Infof("AddOne. DB entry '%s' already exists", fullURL)
+		appLogger.Infof("AddOne - DB entry '%s' already exists", fullURL)
 		return true, nil
 	}
 
@@ -215,32 +215,32 @@ func AddOne(conf *config.Cfg, userID, shortID, fullURL string) (bool, error) {
 		"INSERT INTO urls (user_id, url, short_id) VALUES ($1, $2, $3)",
 		userID, fullURL, shortID)
 	if errA != nil {
-		logger.Zap.Infof("AddOne. Failed to add entry: user ID: '%s', URL '%s', ShortID '%s'",
+		appLogger.Infof("AddOne - failed to add entry: user ID: '%s', URL '%s', ShortID '%s'",
 			userID, fullURL, shortID)
-		logger.Zap.Errorw("AddOne. Error adding DB entry", "error", errA)
+		appLogger.Errorw("AddOne stopped - adding DB entry FAIL", "error", errA)
 		return false, errA
 	}
 
-	logger.Zap.Infof("AddOne. DB entry successful: user ID: '%s', URL '%s', ShortID '%s'",
+	appLogger.Infof("AddOne - DB entry successful: user ID: '%s', URL '%s', ShortID '%s'",
 		userID, fullURL, shortID)
 	return false, nil
 }
 
-func AddOneTransaction(ctx context.Context, tx pgx.Tx, userID, shortID, fullURL string) error {
+func AddOneTransaction(ctx context.Context, tx pgx.Tx, appLogger *zap.SugaredLogger, userID, shortID, fullURL string) error {
 	_, err := tx.Exec(ctx, "INSERT INTO urls (user_id, url, short_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING",
 		userID, fullURL, shortID)
 	if err != nil {
-		logger.Zap.Errorw("AddOneTransaction. Error adding DB entry", "error", err)
+		appLogger.Errorw("AddOneTransaction stopped - adding DB entry FAIL", "error", err)
 		return err
 	}
 
 	return nil
 }
 
-func GetUserURLs(conf *config.Cfg, userID string) ([]UserURL, error) {
+func GetUserURLs(conf *config.Cfg, appLogger *zap.SugaredLogger, userID string) ([]UserURL, error) {
 	rows, err := DBPool.Query(context.Background(), "SELECT short_id, url FROM urls WHERE user_id = $1 AND del_flag = false", userID)
 	if err != nil {
-		logger.Zap.Errorw("GetUserURLs. Query failed", "error", err)
+		appLogger.Errorw("GetUserURLs stopped - query FAIL", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -251,7 +251,7 @@ func GetUserURLs(conf *config.Cfg, userID string) ([]UserURL, error) {
 	for rows.Next() {
 		var u UserURL
 		if err := rows.Scan(&shortID, &u.OriginalURL); err != nil {
-			logger.Zap.Errorw("GetUserURLs. Row scan failed", "error", err)
+			appLogger.Errorw("GetUserURLs - row scan FAIL", "error", err)
 			return nil, err
 		}
 
@@ -261,7 +261,7 @@ func GetUserURLs(conf *config.Cfg, userID string) ([]UserURL, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.Zap.Errorw("GetUserURLs. Row iteration error", "error", err)
+		appLogger.Errorw("GetUserURLs - row iteration FAIL", "error", err)
 		return nil, err
 	}
 

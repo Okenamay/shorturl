@@ -28,7 +28,7 @@ func TestPingHandler(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	router.Get("/ping", PingHandler(Conf))
+	router.Get("/ping", PingHandler(Conf, TestLogger))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

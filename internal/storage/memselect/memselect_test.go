@@ -9,14 +9,21 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/storage/memstorage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 var Conf *config.Cfg
+var TestLogger *zap.SugaredLogger
 
 func TestMain(m *testing.M) {
-	if err := logger.InitLogger(); err != nil {
-		panic("failed to initialize logger for tests: " + err.Error())
+	var err error
+
+	TestLogger, err = logger.InitLogger()
+	if err != nil {
+		TestLogger.Fatalw("Tests stopped - start logger FAIL", "error", err)
 	}
+	defer TestLogger.Sync()
+
 	Conf = config.InitConfig()
 	Conf.MemMode = "memstore"
 
@@ -30,7 +37,7 @@ func TestStoreAndCheckPair(t *testing.T) {
 	shortID := "abcdef123"
 	fullURL := "https://example.com/full"
 
-	exists, err := StorePair(Conf, userID, shortID, fullURL)
+	exists, err := StorePair(Conf, TestLogger, userID, shortID, fullURL)
 	require.NoError(t, err)
 	assert.False(t, exists)
 
@@ -49,12 +56,12 @@ func TestProcessBatchTransaction(t *testing.T) {
 		{CorrelationID: "b", OriginalURL: "https://test2.com"},
 	}
 
-	responseBatch, err := ProcessBatchTransaction(Conf, requestBatch, userID)
+	responseBatch, err := ProcessBatchTransaction(Conf, TestLogger, requestBatch, userID)
 	require.NoError(t, err)
 	require.Len(t, responseBatch, 2)
 
 	assert.Equal(t, "a", responseBatch[0].CorrelationID)
-	assert.Contains(t, responseBatch[0].ShortURL, Conf.ShortIDServerPort)
+	assert.Contains(t, responseBatch[0].ShortURL, Conf.ShortIDAddress)
 
 	allStored := memstorage.Store.GetAll()
 	assert.Len(t, allStored, 2)
@@ -62,7 +69,7 @@ func TestProcessBatchTransaction(t *testing.T) {
 
 func TestGetUserURLs(t *testing.T) {
 	t.Run("GetUserURLs_memstore_returns_nil", func(t *testing.T) {
-		urls, err := GetUserURLs(Conf, "any-user-id")
+		urls, err := GetUserURLs(Conf, TestLogger, "any-user-id")
 		require.NoError(t, err)
 		assert.Nil(t, urls)
 	})

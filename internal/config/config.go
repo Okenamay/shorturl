@@ -5,124 +5,140 @@ import (
 	"os"
 	"strconv"
 	"sync"
-
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 )
 
 // Дефолтные значения до применения флагов:
 const (
-	ShortIDLen  = 10                                             // Длина короткого идентификатора
-	IdleTimeout = 600                                            // Таймаут сервера в секундах
-	ServerPort  = ":8080"                                        // Адрес и порт сервера
-	ShortIDAddr = "http://localhost:8080"                        // Адрес и порт для коротких ID
-	SaveFile    = "/tmp/short-url-db.json"                       // Имя файла-хранилища
-	PostgreDSN  = "postgresql://tester:1234@localhost:5432/pgdb" // DSN по умолчанию
-	Verbose     = false                                          // Флаг детальности логов. !!! Временная заглушка
-	MigrID      = ""                                             // Заглушка
-	MigrDir     = ""                                             // Заглушка
-	DBReinit    = true                                           // Флаг переинициализации БД при старте
-	AuthKey     = "secret_key"                                   // Ключ авторизации.
-	TokenExp    = 24                                             // Срок истечения действия токена.
+	// Длина короткого идентификатора
+	shortIDLen = 10
+	// Таймаут сервера в секундах
+	idleTimeout = 600
+	// Адрес и порт сервера
+	serverPort = ":8080"
+	// Адрес и порт для коротких ID
+	shortIDAddr = "http://localhost:8080"
+	// Имя файла-хранилища
+	saveFile = "/tmp/short-url-db.json"
+	// DSN по умолчанию
+	postgreDSN = "postgresql://tester:1234@localhost:5432/pgdb"
+	// // Заглушка
+	// migrID = ""
+	// // Заглушка
+	// migrDir = ""
+	// Флаг переинициализации БД при старте
+	dbReinit = true
+	// Ключ авторизации
+	authKey = "secret_key"
+	// Срок истечения действия токена
+	tokenExp = 24
+	// Путь к файлу-приёмнику, в который сохраняются логи аудита
+	audFile = ""
+	// Полный URL удаленного сервера-приёмника, куда отправляются логи аудита.
+	audURL = ""
 )
 
+// Cfg определяет структуру конфигурации
 type Cfg struct {
-	ShortIDLen        int
-	IdleTimeout       int
-	ServerPort        string
-	ShortIDServerPort string
-	SaveFilePath      string
-	PostgreDSN        string
-	MemMode           string
-	LogVerbose        bool
-	MigrateID         string
-	MigrateDirection  string
-	DBReinitialize    bool
-	AuthorizationKey  string
-	TokenExpiry       int
+	ShortIDLen       int
+	IdleTimeout      int
+	ServerPort       string
+	ShortIDAddress   string
+	SaveFilePath     string
+	PostgreDSN       string
+	MemMode          string
+	MigrateID        string
+	MigrateDirection string
+	DBReinitialize   bool
+	AuthorizationKey string
+	TokenExpiry      int
+	AuditFile        string
+	AuditURL         string
 }
 
 func parseFlags() *Cfg {
 	config := &Cfg{}
 
-	flag.IntVar(&config.ShortIDLen, "l", ShortIDLen,
+	// Инициализируцемся дефолтными значениями:
+	config.ShortIDLen = shortIDLen
+	config.IdleTimeout = idleTimeout
+	config.ServerPort = serverPort
+	config.ShortIDAddress = shortIDAddr
+	config.SaveFilePath = saveFile
+	config.PostgreDSN = postgreDSN
+	// config.MigrateID = migrID
+	// config.MigrateDirection = migrDir
+	config.DBReinitialize = dbReinit
+	config.AuthorizationKey = authKey
+	config.TokenExpiry = tokenExp
+	config.AuditFile = audFile
+	config.AuditURL = audURL
+
+	// Преписываем всё флагами:
+	flag.IntVar(&config.ShortIDLen, "l", config.ShortIDLen,
 		"Длина короткого ID – целое число от 8 до 32")
-	flag.IntVar(&config.IdleTimeout, "t", IdleTimeout,
+	flag.IntVar(&config.IdleTimeout, "t", config.IdleTimeout,
 		"Таймаут сервера – целое число, желательно от 10 до 600")
-	flag.StringVar(&config.ServerPort, "a", ServerPort,
+	flag.StringVar(&config.ServerPort, "a", config.ServerPort,
 		"Адрес запуска сервера в формате host:port или :port")
-	flag.StringVar(&config.ShortIDServerPort, "b", ShortIDAddr,
+	flag.StringVar(&config.ShortIDAddress, "b", config.ShortIDAddress,
 		"Адрес коротких ID в формате host:port/path")
 	flag.StringVar(&config.SaveFilePath, "f", "",
 		"Адрес места хранения файла")
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
-	flag.BoolVar(&config.LogVerbose, "log", Verbose,
-		"Вывод подробного лога (bool)")
-	flag.StringVar(&config.MigrateID, "migid", MigrID,
-		"ID миграции БД в формате YYYYMMDDHHMMSS")
-	flag.StringVar(&config.MigrateDirection, "migdir", MigrDir,
-		"Направление миграции БД (up = миграция, down = роллбек)")
-	flag.BoolVar(&config.DBReinitialize, "dbx", DBReinit,
+	// flag.StringVar(&config.MigrateID, "migid", migrID,
+	// 	"ID миграции БД в формате YYYYMMDDHHMMSS")
+	// flag.StringVar(&config.MigrateDirection, "migdir", migrDir,
+	// 	"Направление миграции БД (up = миграция, down = роллбек)")
+	flag.BoolVar(&config.DBReinitialize, "dbx", config.DBReinitialize,
 		"Реинициализация БД (bool)")
-	flag.StringVar(&config.AuthorizationKey, "k", AuthKey,
+	flag.StringVar(&config.AuthorizationKey, "k", config.AuthorizationKey,
 		"Ключ для генерации JWT-токена")
-	flag.IntVar(&config.TokenExpiry, "txp", TokenExp,
+	flag.IntVar(&config.TokenExpiry, "txp", config.TokenExpiry,
 		"Срок истечения токена, часов")
+	flag.StringVar(&config.AuditFile, "audit-file", config.AuditFile,
+		"Путь к файлу, в который сохраняются логи аудита")
+	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL,
+		"Полный URL удаленного сервера, куда отправляются логи аудита")
+
 	flag.Parse()
 
-	var saveFilePath, postgreDSN string
-
-	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok && servPort != "" {
+	// Переписываем дефолтные env'ами:
+	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		config.ServerPort = servPort
 	}
-
-	if shortIDServPort, ok := os.LookupEnv("BASE_URL"); ok && shortIDServPort != "" {
-		config.ShortIDServerPort = shortIDServPort
+	if shortIDServPort, ok := os.LookupEnv("BASE_URL"); ok {
+		config.ShortIDAddress = shortIDServPort
 	}
-
-	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok && saveFilePath != "" {
+	if saveFilePath, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		config.SaveFilePath = saveFilePath
-		logger.Zap.Infof("EnvFilePath = %s", saveFilePath)
 	}
-
-	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok && postgreDSN != "" {
+	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		config.PostgreDSN = postgreDSN
-		logger.Zap.Infof("EnvDSN = %s", postgreDSN)
 	}
-
-	if logVerbose, ok := os.LookupEnv("LOGGER_VERBOSE"); ok {
-		config.LogVerbose = (logVerbose == "true")
-		logger.Zap.Infof("EnvVerbose = %s", logVerbose)
-	}
-
-	if migrateID, ok := os.LookupEnv("MIGRATION_ID"); ok && migrateID != "" {
-		config.MigrateID = migrateID
-		logger.Zap.Infof("EnvMigrID = %s", migrateID)
-	}
-
-	if migrateDirection, ok := os.LookupEnv("MIGRATION_DIRECTION"); ok && migrateDirection != "" {
-		config.MigrateDirection = migrateDirection
-		logger.Zap.Infof("EnvMigrDir = %s", migrateDirection)
-	}
-
+	// if migrateID, ok := os.LookupEnv("MIGRATION_ID"); ok {
+	// 	config.MigrateID = migrateID
+	// }
+	// if migrateDirection, ok := os.LookupEnv("MIGRATION_DIRECTION"); ok {
+	// 	config.MigrateDirection = migrateDirection
+	// }
 	if dbReinitialize, ok := os.LookupEnv("DB_REINIT"); ok {
 		config.DBReinitialize = (dbReinitialize == "true")
-		logger.Zap.Infof("EnvVerbose = %s", dbReinitialize)
 	}
-
-	if authorizationKey, ok := os.LookupEnv("AUTH_SECRET_KEY"); ok && authorizationKey != "" {
+	if authorizationKey, ok := os.LookupEnv("AUTH_SECRET_KEY"); ok {
 		config.AuthorizationKey = authorizationKey
-		logger.Zap.Infof("EnvKey = %s", authorizationKey)
 	}
-
-	if tokenExpiryStr, ok := os.LookupEnv("TOKEN_EXPIRY"); ok && tokenExpiryStr != "" {
+	if tokenExpiryStr, ok := os.LookupEnv("TOKEN_EXPIRY"); ok {
 		tokenExpiry, err := strconv.Atoi(tokenExpiryStr)
 		if err == nil {
 			config.TokenExpiry = tokenExpiry
-			logger.Zap.Infof("EnvExpiry = %s", tokenExpiryStr)
-		} else {
-			logger.Zap.Errorf("Could not process TOKEN_EXPIRY: %v", err)
 		}
+	}
+	if auditFile, ok := os.LookupEnv("AUDIT_FILE"); ok {
+		config.AuditFile = auditFile
+	}
+	if auditURL, ok := os.LookupEnv("AUDIT_URL"); ok {
+		config.AuditURL = auditURL
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
@@ -135,27 +151,17 @@ func parseFlags() *Cfg {
 		config.MemMode = "memstore"
 	}
 
-	var useFile bool
-	var useDSN bool
-
-	logger.Zap.Infof("config.SaveFilePath: %s. config.PostgreDSN: %s. "+
-		"useDSN: %t. useFile: %t. saveFilePath: %s. "+
-		"postgreDSN: %s.",
-		config.SaveFilePath, config.PostgreDSN, useDSN, useFile,
-		saveFilePath, postgreDSN)
-
 	return config
 }
 
-func InitConfig() *Cfg {
-	var (
-		once   sync.Once
-		config *Cfg
-	)
+var (
+	once   sync.Once
+	config *Cfg
+)
 
+func InitConfig() *Cfg {
 	once.Do(func() {
 		config = parseFlags()
 	})
-
 	return config
 }

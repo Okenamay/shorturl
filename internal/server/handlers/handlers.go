@@ -9,16 +9,18 @@ import (
 	emsg "github.com/Okenamay/shorturl.git/internal/app/errmsg"
 	"github.com/Okenamay/shorturl.git/internal/app/middleware/auth"
 	"github.com/Okenamay/shorturl.git/internal/app/urlmaker"
+	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
-	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
 	"github.com/Okenamay/shorturl.git/internal/storage/memselect"
 	"github.com/Okenamay/shorturl.git/internal/worker"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 // Обработка запросов на сокращение URL:
-func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
+func ShortenHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		appLogger.Info("ShortenHandler started")
 		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		queryBody, err := io.ReadAll(r.Body)
@@ -27,7 +29,7 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		CheckedURL, checkErr := checker.CheckURL(string(queryBody))
+		CheckedURL, checkErr := checker.CheckURL(string(queryBody), appLogger)
 
 		if checkErr != nil {
 			http.Error(w, checkErr.Error(), http.StatusBadRequest)
@@ -37,16 +39,22 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 		fullURL := CheckedURL.String()
 		newURL, shortID := urlmaker.ProcessURL(conf, fullURL)
 
-		exists, err := memselect.StorePair(conf, userID, shortID, fullURL)
+		exists, err := memselect.StorePair(conf, appLogger, userID, shortID, fullURL)
 		if err != nil {
 			http.Error(w, emsg.ErrorFileSave.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		if auditor != nil {
+			auditor.LogEvent(r.Context(), "shorten", userID, fullURL)
+		}
+
 		w.Header().Set("Content-Type", "text/plain")
 		if exists {
+			appLogger.Warn("ShortenHandler stopped - already exists")
 			w.WriteHeader(http.StatusConflict)
 		} else {
+			appLogger.Info("ShortenHandler finished")
 			w.WriteHeader(http.StatusCreated)
 		}
 		io.WriteString(w, newURL)
@@ -54,9 +62,10 @@ func ShortenHandler(conf *config.Cfg) http.HandlerFunc {
 }
 
 // Обработка запроса на переход по полному URL:
-func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
+func RedirectHandler(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Zap.Info("RedirectHandler. Start")
+		appLogger.Info("RedirectHandler started")
+		userID, _ := r.Context().Value(auth.UserIDContextKey).(string)
 
 		queryID := chi.URLParam(r, "id")
 
@@ -67,22 +76,28 @@ func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 
 		urlInfo, err := memselect.CheckPair(conf, queryID)
 		if err != nil {
-			logger.Zap.Errorw("RedirectHandler. Failed to check URL/ShortID pair", "error", err)
+			appLogger.Errorw("RedirectHandler stopped - URL/ShortID pair check FAIL", "error", err)
 			http.Error(w, "Server error", http.StatusInternalServerError)
 			return
 		}
 
 		if urlInfo.OriginalURL == "" {
-			logger.Zap.Errorw("RedirectHandler. Failed to find URL/ShortID pair", "error", err)
+			appLogger.Errorw("RedirectHandler stopped - URL/ShortID pair find FAIL", "error", err)
 			http.Error(w, emsg.ErrorNotInDB.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if urlInfo.IsDeleted {
+			appLogger.Warn("RedirectHandler stopped - URL deleted")
 			w.WriteHeader(http.StatusGone)
 			return
 		}
 
+		if auditor != nil {
+			auditor.LogEvent(r.Context(), "follow", userID, urlInfo.OriginalURL)
+		}
+
+		appLogger.Info("RedirectHandler finished")
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("Location", urlInfo.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
@@ -90,7 +105,7 @@ func RedirectHandler(conf *config.Cfg) http.HandlerFunc {
 }
 
 // Выдадим авторизованным пользователям их URL:
-func UserURLsHandler(conf *config.Cfg) http.HandlerFunc {
+func UserURLsHandler(conf *config.Cfg, appLogger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, authorized := auth.CheckAuth(r)
 		if !authorized {
@@ -98,7 +113,7 @@ func UserURLsHandler(conf *config.Cfg) http.HandlerFunc {
 			return
 		}
 
-		urls, err := memselect.GetUserURLs(conf, userID)
+		urls, err := memselect.GetUserURLs(conf, appLogger, userID)
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
