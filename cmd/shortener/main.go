@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
 	logger "github.com/Okenamay/shorturl.git/internal/logger/zap"
@@ -13,7 +15,11 @@ func main() {
 	appLogger, err := logger.InitLogger()
 	if err != nil {
 		// Если логгер не стартовал, мы не можем даже это залогировать. Паникуем.
-		panic("failed to initialize logger: " + err.Error())
+		// Используем standard log.Fatalf, что разрешено в main.main
+		log.Fatalf("failed to initialize logger: %v", err)
+
+		// Паника пока отъезжает в легаси
+		// panic("failed to initialize logger: " + err.Error())
 	}
 	defer appLogger.Sync()
 
