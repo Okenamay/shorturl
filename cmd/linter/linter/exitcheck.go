@@ -2,6 +2,7 @@ package linter
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/astutil"
@@ -48,8 +49,11 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			// 1. Проверка на panic()
 			if ident, ok := call.Fun.(*ast.Ident); ok && ident.Name == "panic" {
 				// Проверяем, что это встроенный panic, а не кастомная функция
-				if obj := pass.TypesInfo.ObjectOf(ident); obj == nil {
-					pass.Reportf(call.Pos(), "do not use panic")
+				if obj, ok := pass.TypesInfo.Uses[ident]; ok {
+					// Проверяем, что это действительно встроенная (Builtin) функция
+					if builtin, ok := obj.(*types.Builtin); ok && builtin.Name() == "panic" {
+						pass.Reportf(call.Pos(), "do not use panic")
+					}
 				}
 				return true
 			}
