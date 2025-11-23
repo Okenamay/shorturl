@@ -33,12 +33,9 @@ func main() {
 
 	appLogger, err := logger.InitLogger()
 	if err != nil {
-		// Если логгер не стартовал, мы не можем даже это залогировать. Паникуем.
+		// Если логгер не стартовал, мы не можем даже это залогировать, паникуем.
 		// Используем standard log.Fatalf, что разрешено в main.main
 		log.Fatalf("failed to initialize logger: %v", err)
-
-		// Паника пока отъезжает в легаси
-		// panic("failed to initialize logger: " + err.Error())
 	}
 	defer appLogger.Sync()
 
@@ -62,5 +59,3 @@ func main() {
 
 	defer appLogger.Sync()
 }
-
-// Затравка для 20 инкремента.
