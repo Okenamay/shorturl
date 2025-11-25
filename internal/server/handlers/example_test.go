@@ -28,7 +28,8 @@ func setupExampleServer() (*httptest.Server, *config.Cfg) {
 	// Инициализируем хранилище
 	memstorage.Store = memstorage.NewURLMap()
 	if err := memselect.MemInit(testConf, testLogger); err != nil {
-		log.Fatalf("Failed to init memselect: %v", err)
+		fmt.Printf("Failed to init memselect: %v\n", err)
+		return nil, nil
 	}
 
 	r := chi.NewRouter()
@@ -53,6 +54,10 @@ func setupExampleServer() (*httptest.Server, *config.Cfg) {
 // ExampleShortenHandler демонстрирует использование эндпоинта POST /
 func ExampleShortenHandler() {
 	server, _ := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 
 	client := server.Client()
@@ -60,7 +65,8 @@ func ExampleShortenHandler() {
 	// 1. Создаем запрос на сокращение URL
 	resp, err := client.Post(server.URL+"/", "text/plain", strings.NewReader("https://yandex.ru"))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -76,6 +82,10 @@ func ExampleShortenHandler() {
 // ExampleJSONHandler демонстрирует использование эндпоинта POST /api/shorten
 func ExampleJSONHandler() {
 	server, _ := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 
 	client := server.Client()
@@ -88,7 +98,8 @@ func ExampleJSONHandler() {
 	// 2. Отправляем запрос
 	resp, err := client.Post(server.URL+"/api/shorten", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -97,7 +108,8 @@ func ExampleJSONHandler() {
 		Result string `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&jsonResponse); err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 
 	fmt.Println("Status:", resp.StatusCode)
@@ -110,6 +122,10 @@ func ExampleJSONHandler() {
 // ExampleRedirectHandler демонстрирует редирект с короткого URL
 func ExampleRedirectHandler() {
 	server, _ := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 
 	client := server.Client()
@@ -118,7 +134,8 @@ func ExampleRedirectHandler() {
 	originalURL := "https://practicum.yandex.ru"
 	resp, err := client.Post(server.URL+"/", "text/plain", strings.NewReader(originalURL))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 
 	body, _ := io.ReadAll(resp.Body)
@@ -135,7 +152,8 @@ func ExampleRedirectHandler() {
 
 	resp, err = client.Get(shortURL)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -149,6 +167,10 @@ func ExampleRedirectHandler() {
 // ExamplePingHandler демонстрирует проверку /ping
 func ExamplePingHandler() {
 	server, conf := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 
 	// Для /ping в режиме "memstore" ожидается ошибка,
@@ -157,7 +179,8 @@ func ExamplePingHandler() {
 
 	resp, err := server.Client().Get(server.URL + "/ping")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -170,13 +193,18 @@ func ExamplePingHandler() {
 // (Это пример без проверки вывода, т.к. cookie непредсказуемы)
 func ExampleUserURLsHandler() {
 	server, _ := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 	client := server.Client()
 
 	// 1. Создаем URL, чтобы получить аутентификационный cookie
 	resp, err := client.Post(server.URL+"/", "text/plain", strings.NewReader("https://google.com"))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	resp.Body.Close()
 
@@ -189,7 +217,8 @@ func ExampleUserURLsHandler() {
 		}
 	}
 	if userCookie == nil {
-		log.Fatal("Token cookie not found")
+		fmt.Println("Token cookie not found")
+		return
 	}
 
 	// 2. Делаем запрос к /api/user/urls с этим cookie
@@ -198,7 +227,8 @@ func ExampleUserURLsHandler() {
 
 	resp, err = client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -212,6 +242,10 @@ func ExampleUserURLsHandler() {
 // ExampleBatchHandlerTransaction демонстрирует пакетное сокращение URL
 func ExampleBatchHandlerTransaction() {
 	server, _ := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 	client := server.Client()
 
@@ -223,7 +257,8 @@ func ExampleBatchHandlerTransaction() {
 
 	resp, err := client.Post(server.URL+"/api/shorten/batch", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -243,13 +278,18 @@ func ExampleBatchHandlerTransaction() {
 // (Это пример без проверки вывода)
 func ExampleBatchDeleter() {
 	server, _ := setupExampleServer()
+	if server == nil {
+		fmt.Println("Failed to setup server")
+		return
+	}
 	defer server.Close()
 	client := server.Client()
 
 	// 1. Получаем cookie
 	resp, err := client.Post(server.URL+"/", "text/plain", strings.NewReader("https://to-be-deleted.com"))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	resp.Body.Close()
 
@@ -261,7 +301,8 @@ func ExampleBatchDeleter() {
 		}
 	}
 	if userCookie == nil {
-		log.Fatal("Token cookie not found")
+		fmt.Println("Token cookie not found")
+		return
 	}
 
 	// 2. Готовим ID для удаления (для примера)
@@ -275,7 +316,8 @@ func ExampleBatchDeleter() {
 
 	resp, err = client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
