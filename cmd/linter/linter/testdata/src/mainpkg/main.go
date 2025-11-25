@@ -6,6 +6,8 @@ import (
 )
 
 // otherFunc - функция не в main, здесь вызовы запрещены
+//
+//lint:ignore U1000 "This function is used for analysis testing only"
 func otherFunc() {
 	panic("I am a panic")     // want "do not use panic"
 	log.Fatal("I am fatal")   // want "os.Exit/log.Fatal call outside main.main"
