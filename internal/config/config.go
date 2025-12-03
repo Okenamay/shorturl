@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"strconv"
@@ -53,9 +54,27 @@ type Cfg struct {
 	AuditFile        string // Путь к файлу для логов аудита
 	AuditURL         string // URL для отправки логов аудита
 	EnableHTTPS      bool   // Режим HTTPS
+	ConfigPath       string // Путь к файлу конфигурации
 }
 
-func parseFlags() *Cfg {
+// fileConfig описывает структуру JSON-файла конфигурации. Используем
+// указатели, чтобы различать отсутствие значения и zero-value
+type fileConfig struct {
+	ServerAddress    *string `json:"server_address"`
+	BaseURL          *string `json:"base_url"`
+	FileStoragePath  *string `json:"file_storage_path"`
+	DatabaseDSN      *string `json:"database_dsn"`
+	EnableHTTPS      *bool   `json:"enable_https"`
+	ShortIDLen       *int    `json:"short_id_len"`
+	IdleTimeout      *int    `json:"idle_timeout"`
+	DBReinitialize   *bool   `json:"db_reinitialize"`
+	AuthorizationKey *string `json:"authorization_key"`
+	TokenExpiry      *int    `json:"token_expiry"`
+	AuditFile        *string `json:"audit_file"`
+	AuditURL         *string `json:"audit_url"`
+}
+
+func parseFlags() (*Cfg, error) {
 	config := &Cfg{}
 
 	// Инициализируцемся дефолтными значениями:
@@ -98,9 +117,34 @@ func parseFlags() *Cfg {
 	flag.BoolVar(&config.EnableHTTPS, "s", config.EnableHTTPS,
 		"Включить HTTPS")
 
+	// Флаги работы через файл конфигурации
+	flag.StringVar(&config.ConfigPath, "c", "", "Путь к файлу конфигурации")
+	flag.StringVar(&config.ConfigPath, "config", "", "Путь к файлу конфигурации")
+
 	flag.Parse()
 
-	// Переписываем дефолтные env'ами:
+	// Собираем информацию о флагах, явно установленых пользователем, чтобы
+	// конфиг из файла не перезатирал явно переданные флаги
+	setFlags := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		setFlags[f.Name] = true
+	})
+
+	// Определяем путь к конфигу - еслифлаг не задан, пробуем Env
+	if config.ConfigPath == "" {
+		if cfgPathEnv, ok := os.LookupEnv("CONFIG"); ok {
+			config.ConfigPath = cfgPathEnv
+		}
+	}
+
+	// Если путь к конфигу есть, загружаем и применяем
+	if config.ConfigPath != "" {
+		if err := loadConfigFromFile(config.ConfigPath, config, setFlags); err != nil {
+			return nil, err
+		}
+	}
+
+	// Переписываем значения - дефолтные и из файла конфигурации env'ами:
 	if servPort, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		config.ServerPort = servPort
 	}
@@ -145,17 +189,78 @@ func parseFlags() *Cfg {
 		config.MemMode = "memstore"
 	}
 
-	return config
+	return config, nil
 }
 
 var (
-	once   sync.Once
-	config *Cfg
+	once    sync.Once
+	config  *Cfg
+	initErr error
 )
 
-func InitConfig() *Cfg {
+func InitConfig() (*Cfg, error) {
 	once.Do(func() {
-		config = parseFlags()
+		config, initErr = parseFlags()
 	})
-	return config
+	return config, initErr
+}
+
+func loadConfigFromFile(path string, cfg *Cfg, setFlags map[string]bool) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var fCfg fileConfig
+	if err := json.NewDecoder(file).Decode(&fCfg); err != nil {
+		return err
+	}
+
+	// Применяем значения из файла, если соответствующий флаг не был установлен
+	// -a: ServerAddress
+	if fCfg.ServerAddress != nil && !setFlags["a"] {
+		cfg.ServerPort = *fCfg.ServerAddress
+	}
+	// -b: BaseURL
+	if fCfg.BaseURL != nil && !setFlags["b"] {
+		cfg.ShortIDAddress = *fCfg.BaseURL
+	}
+	// -f: FileStoragePath
+	if fCfg.FileStoragePath != nil && !setFlags["f"] {
+		cfg.SaveFilePath = *fCfg.FileStoragePath
+	}
+	// -d: DatabaseDSN
+	if fCfg.DatabaseDSN != nil && !setFlags["d"] {
+		cfg.PostgreDSN = *fCfg.DatabaseDSN
+	}
+	// -s: EnableHTTPS
+	if fCfg.EnableHTTPS != nil && !setFlags["s"] {
+		cfg.EnableHTTPS = *fCfg.EnableHTTPS
+	}
+
+	// Дополнительные поля
+	if fCfg.ShortIDLen != nil && !setFlags["l"] {
+		cfg.ShortIDLen = *fCfg.ShortIDLen
+	}
+	if fCfg.IdleTimeout != nil && !setFlags["t"] {
+		cfg.IdleTimeout = *fCfg.IdleTimeout
+	}
+	if fCfg.DBReinitialize != nil && !setFlags["dbx"] {
+		cfg.DBReinitialize = *fCfg.DBReinitialize
+	}
+	if fCfg.AuthorizationKey != nil && !setFlags["k"] {
+		cfg.AuthorizationKey = *fCfg.AuthorizationKey
+	}
+	if fCfg.TokenExpiry != nil && !setFlags["txp"] {
+		cfg.TokenExpiry = *fCfg.TokenExpiry
+	}
+	if fCfg.AuditFile != nil && !setFlags["audit-file"] {
+		cfg.AuditFile = *fCfg.AuditFile
+	}
+	if fCfg.AuditURL != nil && !setFlags["audit-url"] {
+		cfg.AuditURL = *fCfg.AuditURL
+	}
+
+	return nil
 }
