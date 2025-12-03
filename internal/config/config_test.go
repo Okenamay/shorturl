@@ -22,6 +22,7 @@ func defaultConfig() *Cfg {
 		TokenExpiry:      tokenExp,
 		AuditFile:        audFile,
 		AuditURL:         audURL,
+		EnableHTTPS:      enableHTTPS,
 	}
 }
 
@@ -46,6 +47,7 @@ func TestInitConfig(t *testing.T) {
 				cfg.PostgreDSN = ""
 				// MemMode вычисляется на основе финальных значений
 				cfg.MemMode = "memstore"
+				cfg.EnableHTTPS = false
 				return cfg
 			}(),
 		},
@@ -57,6 +59,7 @@ func TestInitConfig(t *testing.T) {
 				"-a", "localhost:9090",
 				"-b", "http://test.url",
 				"-f", "/tmp/flag-db.json",
+				"-s",
 			},
 			expected: func() *Cfg {
 				cfg := defaultConfig()
@@ -68,6 +71,7 @@ func TestInitConfig(t *testing.T) {
 				cfg.PostgreDSN = ""
 				// MemMode вычисляется на основе финальных значений
 				cfg.MemMode = "savefile"
+				cfg.EnableHTTPS = true
 				return cfg
 			}(),
 		},
@@ -76,6 +80,7 @@ func TestInitConfig(t *testing.T) {
 			env: map[string]string{
 				"DATABASE_DSN":      "postgres://env-user:env-pass@host/env-db",
 				"FILE_STORAGE_PATH": "/tmp/flag-db.json",
+				"ENABLE_HTTPS":      "true",
 			},
 			args: []string{
 				"cmd",
@@ -92,6 +97,7 @@ func TestInitConfig(t *testing.T) {
 				cfg.PostgreDSN = "postgres://env-user:env-pass@host/env-db"
 				// 4. MemMode вычисляется
 				cfg.MemMode = "postgres"
+				cfg.EnableHTTPS = true
 				return cfg
 			}(),
 		},
@@ -115,6 +121,7 @@ func TestInitConfig(t *testing.T) {
 				cfg.ServerPort = "localhost:9999"
 				// 4. MemMode вычисляется
 				cfg.MemMode = "memstore"
+				cfg.EnableHTTPS = false
 				return cfg
 			}(),
 		},
@@ -126,8 +133,6 @@ func TestInitConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// --- Настройка ---
-
 			// 1. Сбрасываем глобальные переменные
 			// Это необходимо, чтобы sync.Once сработал снова
 			config = nil
@@ -147,12 +152,10 @@ func TestInitConfig(t *testing.T) {
 			// 4. Устанавливаем os.Args для этого теста
 			os.Args = tc.args
 
-			// --- Выполнение ---
 			got := InitConfig()
 
 			assert.Equal(t, tc.expected, got)
 
-			// --- Проверка ---
 			// if !reflect.DeepEqual(tc.expected, got) {
 			// 	// Выводим детальное сравнение в случае ошибки
 			// 	t.Errorf("InitConfig() не совпадает:\nОжидалось: %+v\nПолучено:   %+v", tc.expected, got)

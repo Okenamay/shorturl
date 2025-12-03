@@ -12,6 +12,7 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/server/handlers"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Launch запускает HTTP-сервер на основе предоставленной конфигурации.
@@ -25,12 +26,29 @@ func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Audit
 		IdleTimeout: time.Duration(conf.IdleTimeout) * time.Second,
 	}
 
-	err := server.ListenAndServe()
-	if err != nil {
-		return err
+	if conf.EnableHTTPS {
+		// Конфигурация менеджера autocert
+		manager := &autocert.Manager{
+			// Директория для кэширования сертификатов
+			Cache: autocert.DirCache("certs"),
+			// Функция, принимающая условия предоставления услуг (Terms of
+			// Service)
+			Prompt: autocert.AcceptTOS,
+			// HostPolicy управляет тем, для каких хостов разрешено запрашивать
+			// сертификаты. Если nil, то разрешены все хосты
+		}
+
+		// Подключаем TLS конфигурацию от autocert к нашему серверу
+		server.TLSConfig = manager.TLSConfig()
+
+		appLogger.Infof("Starting HTTPS server on %s", conf.ServerPort)
+		// Пустые строки для certFile и keyFile, так как сертификаты
+		// управляются autocert через TLSConfig
+		return server.ListenAndServeTLS("", "")
 	}
 
-	return nil
+	appLogger.Infof("Starting HTTP server on %s", conf.ServerPort)
+	return server.ListenAndServe()
 }
 
 // NewRouter создает новый экземпляр роутера (http.Handler) с настроенными
