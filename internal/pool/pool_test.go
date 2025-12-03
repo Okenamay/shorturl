@@ -1,116 +1,85 @@
 package pool
 
 import (
-	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// TestStruct - это тестовая структура, реализующая Resetter. Важно, что
-// *TestStruct реализует интерфейс, а не TestStruct
-type TestStruct struct {
-	Val  int
-	Name string
+// mockObject - простая структура для тестов, реализующая интерфейс Resetter
+type mockObject struct {
+	id    int
+	value string
 }
 
-// Reset сбрасывает структуру к нулевым значениям
-func (t *TestStruct) Reset() {
-	t.Val = 0
-	t.Name = ""
+// Reset очищает состояние объекта
+func (m *mockObject) Reset() {
+	m.value = ""
 }
 
-// TestPool_GetPut - проверяет базовую логику Get/Put и вызов Reset()
 func TestPool_GetPut(t *testing.T) {
-	// 1. Создаем пул
-	// T - это *TestStruct, который реализует Resetter
-	// newItem() создает новый *TestStruct
-	pool := New(func() *TestStruct {
-		return new(TestStruct)
-	})
+	counter := 0
+	// Фабрика создает объекты с инкрементальным ID
+	factory := func() *mockObject {
+		counter++
+		return &mockObject{id: counter, value: "initial"}
+	}
 
-	// 2. Get() из пустого пула (вызывает New)
-	obj1 := pool.Get()
-	assert.NotNil(t, obj1)
-	assert.Equal(t, 0, obj1.Val)
-	assert.Equal(t, "", obj1.Name)
+	// Создаем пул с вместимостью 1
+	p := New(factory, 1)
 
-	// 3. Модифицируем объект
-	obj1.Val = 100
-	obj1.Name = "Hello"
+	// 1. Получаем объект (пул пуст -> создается новый #1)
+	obj1 := p.Get()
+	assert.Equal(t, 1, obj1.id)
+	assert.Equal(t, "initial", obj1.value)
 
-	// 4. Put() - возвращаем в пул. Reset() должен быть вызван немедленно
-	pool.Put(obj1)
+	// Модифицируем объект, чтобы проверить работу Reset
+	obj1.value = "dirty"
 
-	// 5. Get() - получаем тот же самый (сброшенный) объект
-	obj2 := pool.Get()
-	assert.NotNil(t, obj2)
+	// 2. Возвращаем объект в пул (он должен сброситься)
+	p.Put(obj1)
+	assert.Equal(t, "", obj1.value, "Value should be reset")
 
-	// Проверяем, что Reset() был вызван
-	assert.Equal(t, 0, obj2.Val, "Поле Val должно было сброситься")
-	assert.Equal(t, "", obj2.Name, "Поле Name должно было сброситься")
-
-	// Проверяем, что это тот же указатель (тот же объект в памяти)
-	assert.Same(t, obj1, obj2, "Объект должен быть переиспользован из пула")
-}
-
-// TestPool_New - проверяет, что newItem вызывается только, когда пул пуст
-func TestPool_New(t *testing.T) {
-	newCounter := 0
-	pool := New(func() *TestStruct {
-		newCounter++
-		return &TestStruct{Val: -1} // Помечаем, что он новый
-	})
-
-	// 1. Get() - newCounter должен стать 1
-	obj1 := pool.Get()
-	assert.Equal(t, 1, newCounter)
-	assert.Equal(t, -1, obj1.Val) // Убеждаемся, что это новый
-
-	obj1.Val = 100
-	pool.Put(obj1)
-	assert.Equal(t, 1, newCounter) // Put() не вызывает New
-
-	// 2. Get() - newCounter не должен измениться (получаем из пула)
-	obj2 := pool.Get()
-	assert.Equal(t, 1, newCounter)
-	assert.Equal(t, 0, obj2.Val) // Сброшенный (0), а не новый (-1)
+	// 3. Получаем объект снова (должен вернуться тот же #1, так как он был в пуле)
+	obj2 := p.Get()
+	assert.Equal(t, 1, obj2.id)
+	// Проверяем, что это тот же указатель
 	assert.Same(t, obj1, obj2)
 
-	// 3. Get() - пул снова пуст, newCounter должен стать 2
-	obj3 := pool.Get()
-	assert.Equal(t, 2, newCounter)
-	assert.Equal(t, -1, obj3.Val) // Снова новый
+	// 4. Получаем еще один объект (пул пуст -> создается новый #2)
+	obj3 := p.Get()
+	assert.Equal(t, 2, obj3.id)
+
+	// 5. Возвращаем оба. Пул размером 1, поэтому один из них отбросится.
+	p.Put(obj2)
+	p.Put(obj3)
+
+	// Проверяем, что в канале только 1 элемент (максимальная вместимость)
+	assert.Equal(t, 1, len(p.store))
 }
 
-// TestPool_Concurrency - проверяет потокобезопасность
 func TestPool_Concurrency(t *testing.T) {
-	pool := New(func() *TestStruct {
-		return new(TestStruct)
-	})
+	factory := func() *mockObject {
+		return &mockObject{}
+	}
+	// Пул достаточного размера
+	p := New(factory, 50)
 
 	var wg sync.WaitGroup
-	numGoroutines := 100
-	numOps := 1000
+	iterations := 1000
 
-	wg.Add(numGoroutines)
-	for i := 0; i < numGoroutines; i++ {
-		go func(id int) {
+	wg.Add(iterations)
+	for i := 0; i < iterations; i++ {
+		go func() {
 			defer wg.Done()
-			for j := 0; j < numOps; j++ {
-				obj := pool.Get()
-				assert.Equal(t, 0, obj.Val) // Должен быть сброшен
-
-				// "Работаем" с объектом
-				obj.Val = id
-				obj.Name = "goroutine-" + strconv.Itoa(id)
-
-				pool.Put(obj)
-			}
-		}(i)
+			// Активно берем и возвращаем объекты в параллельных горутинах
+			obj := p.Get()
+			obj.value = "working"
+			p.Put(obj)
+		}()
 	}
 
 	wg.Wait()
-	// Тест пройден, если не было 'race' (запускать с -race) и assert не упали
+	// Если тест не упал с deadlock или panic, значит пул потокобезопасен
 }

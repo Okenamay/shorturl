@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Okenamay/shorturl.git/internal/audit"
@@ -11,15 +12,30 @@ import (
 	"github.com/Okenamay/shorturl.git/internal/worker"
 )
 
+// Переменные для информации о сборке (будут установлены через -ldflags)
+var buildVersion string
+var buildDate string
+var buildCommit string
+
 func main() {
+	// Вспомогательная функция для вывода "N/A", если переменная пуста
+	na := func(s string) string {
+		if s == "" {
+			return "N/A"
+		}
+		return s
+	}
+
+	// Выводим информацию о сборке в stdout
+	fmt.Printf("Build version: %s\n", na(buildVersion))
+	fmt.Printf("Build date: %s\n", na(buildDate))
+	fmt.Printf("Build commit: %s\n", na(buildCommit))
+
 	appLogger, err := logger.InitLogger()
 	if err != nil {
-		// Если логгер не стартовал, мы не можем даже это залогировать. Паникуем.
+		// Если логгер не стартовал, мы не можем даже это залогировать, паникуем.
 		// Используем standard log.Fatalf, что разрешено в main.main
 		log.Fatalf("failed to initialize logger: %v", err)
-
-		// Паника пока отъезжает в легаси
-		// panic("failed to initialize logger: " + err.Error())
 	}
 	defer appLogger.Sync()
 
@@ -43,5 +59,3 @@ func main() {
 
 	defer appLogger.Sync()
 }
-
-// Затравка для 20 инкремента.

@@ -64,17 +64,28 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 
-			// Ищем sel.X (имя пакета)
-			pkgIdent, ok := sel.X.(*ast.Ident)
+			// Получаем идентификатор слева от точки (например, "os" в "os.Exit")
+			xIdent, ok := sel.X.(*ast.Ident)
 			if !ok {
 				return true
 			}
 
-			// Имя функции (sel.Sel.Name)
+			// Используем TypesInfo, чтобы понять, что это за объект
+			obj := pass.TypesInfo.Uses[xIdent]
+
+			// Нам нужны только те случаи, когда xIdent ссылается на имя пакета (PkgName)
+			pkgName, ok := obj.(*types.PkgName)
+			if !ok {
+				// Это не вызов функции пакета (например, это вызов метода структуры), пропускаем
+				return true
+			}
+
+			// Получаем реальный путь импорта пакета (например, "os" или "log")
+			pkgPath := pkgName.Imported().Path()
 			funcName := sel.Sel.Name
 
-			isOsExit := pkgIdent.Name == "os" && funcName == "Exit"
-			isLogFatal := pkgIdent.Name == "log" && (funcName == "Fatal" || funcName == "Fatalf")
+			isOsExit := pkgPath == "os" && funcName == "Exit"
+			isLogFatal := pkgPath == "log" && (funcName == "Fatal" || funcName == "Fatalf")
 
 			if isOsExit || isLogFatal {
 				// Правило 2: Разрешено использовать только в main.main
@@ -82,7 +93,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					pass.Reportf(call.Pos(), "os.Exit/log.Fatal call outside main.main")
 				}
 			}
-
 			return true
 		})
 	}
