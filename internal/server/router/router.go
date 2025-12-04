@@ -15,12 +15,12 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// Launch запускает HTTP-сервер на основе предоставленной конфигурации.
-// Эта функция блокирует выполнение до тех пор, пока сервер не будет остановлен.
-func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) error {
+// CreateServer запускает HTTP-сервер на основе предоставленной конфигурации.
+// Эта функция блокирует выполнение до тех пор, пока сервер не будет остановлен
+func CreateServer(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Auditor) *http.Server {
 	router := NewRouter(conf, appLogger, auditor)
 
-	server := http.Server{
+	server := &http.Server{
 		Addr:        conf.ServerPort,
 		Handler:     router,
 		IdleTimeout: time.Duration(conf.IdleTimeout) * time.Second,
@@ -31,24 +31,20 @@ func Launch(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Audit
 		manager := &autocert.Manager{
 			// Директория для кэширования сертификатов
 			Cache: autocert.DirCache("certs"),
-			// Функция, принимающая условия предоставления услуг (Terms of
-			// Service)
+			// Функция, принимающая Terms of Service
 			Prompt: autocert.AcceptTOS,
-			// HostPolicy управляет тем, для каких хостов разрешено запрашивать
-			// сертификаты. Если nil, то разрешены все хосты
+			// HostPolicy = nil, то есть, разрешены все хосты
 		}
 
-		// Подключаем TLS конфигурацию от autocert к нашему серверу
+		// Подключаем TLS конфигурацию от autocert
 		server.TLSConfig = manager.TLSConfig()
 
-		appLogger.Infof("Starting HTTPS server on %s", conf.ServerPort)
-		// Пустые строки для certFile и keyFile, так как сертификаты
-		// управляются autocert через TLSConfig
-		return server.ListenAndServeTLS("", "")
+		appLogger.Infof("Configured HTTPS server on %s", conf.ServerPort)
+		return server
 	}
 
-	appLogger.Infof("Starting HTTP server on %s", conf.ServerPort)
-	return server.ListenAndServe()
+	appLogger.Infof("Configured HTTP server on %s", conf.ServerPort)
+	return server
 }
 
 // NewRouter создает новый экземпляр роутера (http.Handler) с настроенными

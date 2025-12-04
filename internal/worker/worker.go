@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/Okenamay/shorturl.git/internal/storage/database"
@@ -13,11 +14,15 @@ type DeleteTask struct {
 	ShortIDs []string
 }
 
-var DeleteChan chan DeleteTask
+var (
+	DeleteChan chan DeleteTask
+	wg         sync.WaitGroup
+)
 
 type BatchDeleteFunc func(ctx context.Context, appLogger *zap.SugaredLogger, userID string, shortIDs []string) error
 
 func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc, appLogger *zap.SugaredLogger) {
+	defer wg.Done() // Сообщаем, что воркер закончил работу
 	var deleteBuffer []DeleteTask
 
 	flushBuffer := func() {
@@ -35,7 +40,7 @@ func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc, app
 		for userID, shortIDs := range tasksByUser {
 			err := batchDeleter(context.Background(), appLogger, userID, shortIDs)
 			if err != nil {
-				appLogger.Errorw("softDeleter stopped - deletion worker batch delete FAIL", "error", err, "userID", userID)
+				appLogger.Errorw("softDeleter stopped - batch delete FAIL", "error", err, "userID", userID)
 			}
 		}
 
@@ -43,26 +48,29 @@ func softDeleter(deleteChan <-chan DeleteTask, batchDeleter BatchDeleteFunc, app
 		deleteBuffer = nil
 	}
 
-	go func() {
-		ticker := time.NewTicker(2 * time.Second)
-		defer ticker.Stop()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 
-		for {
-			select {
-			case task := <-deleteChan:
-				deleteBuffer = append(deleteBuffer, task)
-				if len(deleteBuffer) >= 25 {
-					appLogger.Info("softDeletion - buffer reached size threshold, flushing...")
-					flushBuffer()
-
-					ticker.Reset(2 * time.Second)
-				}
-			case <-ticker.C:
-				appLogger.Info("softDeletion - deletion ticker fired, flushing...")
+	for {
+		select {
+		case task, ok := <-deleteChan:
+			if !ok {
+				// Канал закрыт, сбрасываем остатки и выходим
+				appLogger.Info("softDeleter stopping - channel closed")
 				flushBuffer()
+				return
 			}
+			deleteBuffer = append(deleteBuffer, task)
+			if len(deleteBuffer) >= 25 {
+				appLogger.Info("softDeletion - buffer reached size threshold, flushing...")
+				flushBuffer()
+				ticker.Reset(2 * time.Second)
+			}
+		case <-ticker.C:
+			appLogger.Info("softDeletion - deletion ticker fired, flushing...")
+			flushBuffer()
 		}
-	}()
+	}
 }
 
 func hardDeleter(appLogger *zap.SugaredLogger) {
@@ -83,8 +91,17 @@ func hardDeleter(appLogger *zap.SugaredLogger) {
 
 func Start(batchDeleter BatchDeleteFunc, appLogger *zap.SugaredLogger) {
 	DeleteChan = make(chan DeleteTask, 1024)
-	softDeleter(DeleteChan, batchDeleter, appLogger)
+	wg.Add(1)
+	go softDeleter(DeleteChan, batchDeleter, appLogger)
 	hardDeleter(appLogger)
+}
+
+// Stop корректно останавливает воркеры, дожидаясь обработки всех задач
+func Stop(appLogger *zap.SugaredLogger) {
+	appLogger.Info("Stopping workers...")
+	close(DeleteChan)
+	wg.Wait()
+	appLogger.Info("Workers stopped")
 }
 
 func SendToDelete(userID string, shortIDs []string) {
