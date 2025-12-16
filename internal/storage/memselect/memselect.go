@@ -204,3 +204,13 @@ func GetUserURLs(conf *config.Cfg, appLogger *zap.SugaredLogger, userID string) 
 	}
 	return database.GetUserURLs(conf, appLogger, userID)
 }
+
+func GetStats(ctx context.Context, conf *config.Cfg, appLogger *zap.SugaredLogger) (int, int, error) {
+	if conf.MemMode == "postgres" {
+		return database.GetStats(ctx)
+	}
+	// В режиме памяти/файла мы не храним список пользователей в memstorage,
+	// только map[short]full, поэтому возвращаем количество URL и ноль
+	// пользователей
+	return len(memstorage.Store.GetAll()), 0, nil
+}
