@@ -3,10 +3,12 @@ package config
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func defaultConfig() *Cfg {
@@ -27,6 +29,16 @@ func defaultConfig() *Cfg {
 }
 
 func TestInitConfig(t *testing.T) {
+	// Создаем временный файл конфига для тестов
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.json")
+	configData := []byte(`{
+		"server_address": "localhost:7000",
+		"base_url": "http://config.url",
+		"enable_https": true,
+		"file_storage_path": "/tmp/config-db.json"
+	}`)
+	require.NoError(t, os.WriteFile(configFile, configData, 0644))
 
 	// Определяем тестовые сценарии
 	testCases := []struct {
@@ -41,18 +53,32 @@ func TestInitConfig(t *testing.T) {
 			env:  map[string]string{},
 			expected: func() *Cfg {
 				cfg := defaultConfig()
-				// Флаги -f и -d имеют default "", который перезаписывает
-				// значения из констант (saveFile и postgreDSN)
 				cfg.SaveFilePath = ""
 				cfg.PostgreDSN = ""
-				// MemMode вычисляется на основе финальных значений
 				cfg.MemMode = "memstore"
 				cfg.EnableHTTPS = false
 				return cfg
 			}(),
 		},
 		{
-			name: "values from flags",
+			name: "config_file_values",
+			args: []string{"cmd", "-c", configFile},
+			env:  map[string]string{},
+			expected: func() *Cfg {
+				cfg := defaultConfig()
+				// Значения из файла
+				cfg.ServerPort = "localhost:7000"
+				cfg.ShortIDAddress = "http://config.url"
+				cfg.EnableHTTPS = true
+				cfg.SaveFilePath = "/tmp/config-db.json"
+				cfg.PostgreDSN = ""
+				cfg.ConfigPath = configFile
+				cfg.MemMode = "savefile"
+				return cfg
+			}(),
+		},
+		{
+			name: "values_from_flags",
 			env:  map[string]string{},
 			args: []string{
 				"cmd",
@@ -67,11 +93,27 @@ func TestInitConfig(t *testing.T) {
 				cfg.ServerPort = "localhost:9090"
 				cfg.ShortIDAddress = "http://test.url"
 				cfg.SaveFilePath = "/tmp/flag-db.json"
-				// Флаг -d не был предоставлен, поэтому он получает свой default ""
 				cfg.PostgreDSN = ""
-				// MemMode вычисляется на основе финальных значений
 				cfg.MemMode = "savefile"
 				cfg.EnableHTTPS = true
+				return cfg
+			}(),
+		},
+		{
+			name: "flag_overrides_config_file",
+			args: []string{"cmd", "-config", configFile, "-a", ":9090"},
+			env:  map[string]string{},
+			expected: func() *Cfg {
+				cfg := defaultConfig()
+				// Флаг -a перебивает файл
+				cfg.ServerPort = ":9090"
+				// Остальное из файла
+				cfg.ShortIDAddress = "http://config.url"
+				cfg.EnableHTTPS = true
+				cfg.SaveFilePath = "/tmp/config-db.json"
+				cfg.PostgreDSN = ""
+				cfg.ConfigPath = configFile
+				cfg.MemMode = "savefile"
 				return cfg
 			}(),
 		},
@@ -125,6 +167,45 @@ func TestInitConfig(t *testing.T) {
 				return cfg
 			}(),
 		},
+		{
+			name: "env_overrides_flag_and_config",
+			args: []string{"cmd", "-c", configFile, "-a", ":9090"},
+			env: map[string]string{
+				"SERVER_ADDRESS": ":5000",
+			},
+			expected: func() *Cfg {
+				cfg := defaultConfig()
+				// Env перебивает Флаг и Файл
+				cfg.ServerPort = ":5000"
+				// Остальное из файла
+				cfg.ShortIDAddress = "http://config.url"
+				cfg.EnableHTTPS = true
+				cfg.SaveFilePath = "/tmp/config-db.json"
+				cfg.PostgreDSN = ""
+				cfg.ConfigPath = configFile
+				cfg.MemMode = "savefile"
+				return cfg
+			}(),
+		},
+		{
+			name: "config_path_from_env",
+			args: []string{"cmd"},
+			env: map[string]string{
+				"CONFIG": configFile,
+			},
+			expected: func() *Cfg {
+				cfg := defaultConfig()
+				// Значения из файла
+				cfg.ServerPort = "localhost:7000"
+				cfg.ShortIDAddress = "http://config.url"
+				cfg.EnableHTTPS = true
+				cfg.SaveFilePath = "/tmp/config-db.json"
+				cfg.PostgreDSN = ""
+				cfg.ConfigPath = configFile
+				cfg.MemMode = "savefile"
+				return cfg
+			}(),
+		},
 	}
 
 	// Сохраняем оригинальные os.Args, чтобы восстановить их после теста
@@ -134,32 +215,25 @@ func TestInitConfig(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// 1. Сбрасываем глобальные переменные
-			// Это необходимо, чтобы sync.Once сработал снова
 			config = nil
+			initErr = nil
 			once = sync.Once{}
 
 			// 2. Сбрасываем состояние пакета flag
-			// Это необходимо, т.к. flag.Parse() нельзя вызывать
-			// несколько раз на одном и том же (глобальном) FlagSet.
 			flag.CommandLine = flag.NewFlagSet(tc.args[0], flag.ExitOnError)
 
-			// 3. Устанавливаем переменные окружения для этого теста
-			// t.Setenv() автоматически очистит их после t.Run()
+			// 3. Устанавливаем переменные окружения
 			for key, value := range tc.env {
 				t.Setenv(key, value)
 			}
 
-			// 4. Устанавливаем os.Args для этого теста
+			// 4. Устанавливаем os.Args
 			os.Args = tc.args
 
-			got := InitConfig()
+			got, err := InitConfig()
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.expected, got)
-
-			// if !reflect.DeepEqual(tc.expected, got) {
-			// 	// Выводим детальное сравнение в случае ошибки
-			// 	t.Errorf("InitConfig() не совпадает:\nОжидалось: %+v\nПолучено:   %+v", tc.expected, got)
-			// }
 		})
 	}
 }

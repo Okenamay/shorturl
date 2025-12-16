@@ -24,7 +24,10 @@ func TestMain(m *testing.M) {
 	}
 	defer TestLogger.Sync()
 
-	Conf = config.InitConfig()
+	Conf, err := config.InitConfig()
+	if err != nil {
+		TestLogger.Fatalw("Tests stopped - config init FAIL", "error", err)
+	}
 	Conf.MemMode = "memstore"
 
 	os.Exit(m.Run())

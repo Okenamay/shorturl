@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	testConf    *config.Cfg
 	testLogger  *zap.SugaredLogger
 	testAuditor *audit.Auditor
 	testRouter  http.Handler
@@ -21,7 +20,10 @@ var (
 
 // TestMain настраивает общие зависимости для всех тестов в этом пакете.
 func TestMain(m *testing.M) {
-	testConf = config.InitConfig()
+	testConf, err := config.InitConfig()
+	if err != nil {
+		panic(err)
+	}
 	if testConf.AuthorizationKey == "" {
 		testConf.AuthorizationKey = "test-secret-key"
 	}

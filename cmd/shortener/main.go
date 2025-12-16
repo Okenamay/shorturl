@@ -33,13 +33,16 @@ func main() {
 
 	appLogger, err := logger.InitLogger()
 	if err != nil {
-		// Если логгер не стартовал, мы не можем даже это залогировать, паникуем.
-		// Используем standard log.Fatalf, что разрешено в main.main
+		// Если логгер не стартовал, мы не можем даже это залогировать,
+		// паникуем. Используем log.Fatalf, что разрешено в main.main
 		log.Fatalf("failed to initialize logger: %v", err)
 	}
 	defer appLogger.Sync()
 
-	conf := config.InitConfig()
+	conf, err := config.InitConfig()
+	if err != nil {
+		appLogger.Fatalw("failed to init config", "error", err)
+	}
 	auditor := audit.NewAuditor(conf.AuditFile, conf.AuditURL, appLogger)
 
 	worker.Start(memselect.BatchDelete, appLogger)

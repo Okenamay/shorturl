@@ -21,7 +21,11 @@ import (
 
 // setupExampleServer инициализирует роутер и тестовый сервер.
 func setupExampleServer() (*httptest.Server, *config.Cfg) {
-	testConf := config.InitConfig()
+	testConf, err := config.InitConfig()
+	if err != nil {
+		fmt.Printf("Failed to init config: %v\n", err)
+		return nil, nil
+	}
 	testConf.MemMode = "memstore" // Используем in-memory хранилище
 	testLogger := zap.NewNop().Sugar()
 
