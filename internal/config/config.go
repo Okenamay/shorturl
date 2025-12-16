@@ -37,7 +37,7 @@ const (
 )
 
 // Cfg определяет структуру конфигурации всего приложения.
-// Поля заполняются из командной строки (флаги) и переменных окружения.
+// Поля заполняются из командной строки (флаги) и переменных окружения
 type Cfg struct {
 	ShortIDLen       int    // Длина генерируемого короткого URL
 	IdleTimeout      int    // Таймаут неактивности сервера
@@ -92,7 +92,7 @@ func parseFlags() (*Cfg, error) {
 	// Преписываем всё флагами:
 	flag.IntVar(&config.ShortIDLen, "l", config.ShortIDLen,
 		"Длина короткого ID – целое число от 8 до 32")
-	flag.IntVar(&config.IdleTimeout, "t", config.IdleTimeout,
+	flag.IntVar(&config.IdleTimeout, "tio", config.IdleTimeout,
 		"Таймаут сервера – целое число, желательно от 10 до 600")
 	flag.StringVar(&config.ServerPort, "a", config.ServerPort,
 		"Адрес запуска сервера в формате host:port или :port")
