@@ -34,6 +34,8 @@ const (
 	audURL = ""
 	// HTTPS по умолчанию выключен
 	enableHTTPS = false
+	// Порт gRPC по умолчанию
+	grpcPort = ":3200"
 )
 
 // Cfg определяет структуру конфигурации всего приложения.
@@ -54,6 +56,7 @@ type Cfg struct {
 	EnableHTTPS      bool   // Режим HTTPS
 	TrustedSubnet    string // Доверенная подсеть (CIDR)
 	ConfigPath       string // Путь к файлу конфигурации
+	GRPCAddress      string // Адрес запуска gRPC сервера
 }
 
 // fileConfig описывает структуру JSON-файла конфигурации. Используем
@@ -72,6 +75,7 @@ type fileConfig struct {
 	AuditFile        *string `json:"audit_file"`
 	AuditURL         *string `json:"audit_url"`
 	TrustedSubnet    *string `json:"trusted_subnet"`
+	GRPCAddress      *string `json:"grpc_address"`
 }
 
 func parseFlags() (*Cfg, error) {
@@ -90,6 +94,7 @@ func parseFlags() (*Cfg, error) {
 	config.AuditFile = audFile
 	config.AuditURL = audURL
 	config.EnableHTTPS = enableHTTPS
+	config.GRPCAddress = grpcPort
 
 	// Преписываем всё флагами:
 	flag.IntVar(&config.ShortIDLen, "l", config.ShortIDLen,
@@ -118,6 +123,8 @@ func parseFlags() (*Cfg, error) {
 		"Включить HTTPS")
 	flag.StringVar(&config.TrustedSubnet, "t", "",
 		"Строковое представление бесклассовой адресации (CIDR)")
+	flag.StringVar(&config.GRPCAddress, "g", config.GRPCAddress,
+		"Адрес запуска gRPC сервера")
 
 	// Флаги работы через файл конфигурации
 	flag.StringVar(&config.ConfigPath, "c", "", "Путь к файлу конфигурации")
@@ -182,6 +189,9 @@ func parseFlags() (*Cfg, error) {
 	}
 	if trustedSubnet, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
 		config.TrustedSubnet = trustedSubnet
+	}
+	if grpcAddr, ok := os.LookupEnv("GRPC_PORT"); ok {
+		config.GRPCAddress = grpcAddr
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
@@ -268,6 +278,9 @@ func loadConfigFromFile(path string, cfg *Cfg, setFlags map[string]bool) error {
 	}
 	if fCfg.TrustedSubnet != nil && !setFlags["t"] {
 		cfg.TrustedSubnet = *fCfg.TrustedSubnet
+	}
+	if fCfg.GRPCAddress != nil && !setFlags["g"] {
+		cfg.GRPCAddress = *fCfg.GRPCAddress
 	}
 
 	return nil
