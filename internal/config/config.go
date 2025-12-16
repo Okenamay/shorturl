@@ -21,10 +21,6 @@ const (
 	saveFile = "/tmp/short-url-db.json"
 	// DSN по умолчанию
 	postgreDSN = "postgresql://tester:1234@localhost:5432/pgdb"
-	// // Заглушка
-	// migrID = ""
-	// // Заглушка
-	// migrDir = ""
 	// Флаг переинициализации БД при старте
 	dbReinit = true
 	// Ключ авторизации
@@ -35,6 +31,8 @@ const (
 	audFile = ""
 	// Полный URL удаленного сервера-приёмника, куда отправляются логи аудита.
 	audURL = ""
+	// HTTPS по умолчанию выключен
+	enableHTTPS = false
 )
 
 // Cfg определяет структуру конфигурации всего приложения.
@@ -54,6 +52,7 @@ type Cfg struct {
 	TokenExpiry      int    // Срок жизни JWT-токена в часах
 	AuditFile        string // Путь к файлу для логов аудита
 	AuditURL         string // URL для отправки логов аудита
+	EnableHTTPS      bool   // Режим HTTPS
 }
 
 func parseFlags() *Cfg {
@@ -66,13 +65,12 @@ func parseFlags() *Cfg {
 	config.ShortIDAddress = shortIDAddr
 	config.SaveFilePath = saveFile
 	config.PostgreDSN = postgreDSN
-	// config.MigrateID = migrID
-	// config.MigrateDirection = migrDir
 	config.DBReinitialize = dbReinit
 	config.AuthorizationKey = authKey
 	config.TokenExpiry = tokenExp
 	config.AuditFile = audFile
 	config.AuditURL = audURL
+	config.EnableHTTPS = enableHTTPS
 
 	// Преписываем всё флагами:
 	flag.IntVar(&config.ShortIDLen, "l", config.ShortIDLen,
@@ -87,10 +85,6 @@ func parseFlags() *Cfg {
 		"Адрес места хранения файла")
 	flag.StringVar(&config.PostgreDSN, "d", "",
 		"DSN подключения к СУБД PostgreSQL")
-	// flag.StringVar(&config.MigrateID, "migid", migrID,
-	// 	"ID миграции БД в формате YYYYMMDDHHMMSS")
-	// flag.StringVar(&config.MigrateDirection, "migdir", migrDir,
-	// 	"Направление миграции БД (up = миграция, down = роллбек)")
 	flag.BoolVar(&config.DBReinitialize, "dbx", config.DBReinitialize,
 		"Реинициализация БД (bool)")
 	flag.StringVar(&config.AuthorizationKey, "k", config.AuthorizationKey,
@@ -101,6 +95,8 @@ func parseFlags() *Cfg {
 		"Путь к файлу, в который сохраняются логи аудита")
 	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL,
 		"Полный URL удаленного сервера, куда отправляются логи аудита")
+	flag.BoolVar(&config.EnableHTTPS, "s", config.EnableHTTPS,
+		"Включить HTTPS")
 
 	flag.Parse()
 
@@ -117,12 +113,6 @@ func parseFlags() *Cfg {
 	if postgreDSN, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		config.PostgreDSN = postgreDSN
 	}
-	// if migrateID, ok := os.LookupEnv("MIGRATION_ID"); ok {
-	// 	config.MigrateID = migrateID
-	// }
-	// if migrateDirection, ok := os.LookupEnv("MIGRATION_DIRECTION"); ok {
-	// 	config.MigrateDirection = migrateDirection
-	// }
 	if dbReinitialize, ok := os.LookupEnv("DB_REINIT"); ok {
 		config.DBReinitialize = (dbReinitialize == "true")
 	}
@@ -140,6 +130,9 @@ func parseFlags() *Cfg {
 	}
 	if auditURL, ok := os.LookupEnv("AUDIT_URL"); ok {
 		config.AuditURL = auditURL
+	}
+	if enableHTTPS, ok := os.LookupEnv("ENABLE_HTTPS"); ok {
+		config.EnableHTTPS = (enableHTTPS == "true" || enableHTTPS == "1")
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
