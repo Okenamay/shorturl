@@ -52,6 +52,7 @@ type Cfg struct {
 	AuditFile        string // Путь к файлу для логов аудита
 	AuditURL         string // URL для отправки логов аудита
 	EnableHTTPS      bool   // Режим HTTPS
+	TrustedSubnet    string // Доверенная подсеть (CIDR)
 	ConfigPath       string // Путь к файлу конфигурации
 }
 
@@ -70,6 +71,7 @@ type fileConfig struct {
 	TokenExpiry      *int    `json:"token_expiry"`
 	AuditFile        *string `json:"audit_file"`
 	AuditURL         *string `json:"audit_url"`
+	TrustedSubnet    *string `json:"trusted_subnet"`
 }
 
 func parseFlags() (*Cfg, error) {
@@ -114,6 +116,8 @@ func parseFlags() (*Cfg, error) {
 		"Полный URL удаленного сервера, куда отправляются логи аудита")
 	flag.BoolVar(&config.EnableHTTPS, "s", config.EnableHTTPS,
 		"Включить HTTPS")
+	flag.StringVar(&config.TrustedSubnet, "t", "",
+		"Строковое представление бесклассовой адресации (CIDR)")
 
 	// Флаги работы через файл конфигурации
 	flag.StringVar(&config.ConfigPath, "c", "", "Путь к файлу конфигурации")
@@ -175,6 +179,9 @@ func parseFlags() (*Cfg, error) {
 	}
 	if enableHTTPS, ok := os.LookupEnv("ENABLE_HTTPS"); ok {
 		config.EnableHTTPS = (enableHTTPS == "true" || enableHTTPS == "1")
+	}
+	if trustedSubnet, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
+		config.TrustedSubnet = trustedSubnet
 	}
 
 	// Проверим режим работы с данными и сформируем соотвествующий индикатор,
@@ -258,6 +265,9 @@ func loadConfigFromFile(path string, cfg *Cfg, setFlags map[string]bool) error {
 	}
 	if fCfg.AuditURL != nil && !setFlags["audit-url"] {
 		cfg.AuditURL = *fCfg.AuditURL
+	}
+	if fCfg.TrustedSubnet != nil && !setFlags["t"] {
+		cfg.TrustedSubnet = *fCfg.TrustedSubnet
 	}
 
 	return nil
