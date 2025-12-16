@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Okenamay/shorturl.git/internal/audit"
 	"github.com/Okenamay/shorturl.git/internal/config"
@@ -51,14 +57,53 @@ func main() {
 	if err != nil {
 		appLogger.Errorw(err.Error(), "Main", "Initialize storage")
 	}
-	defer memselect.MemStop(conf, appLogger)
+	// MemStop отложим до graceful shutdown, чтобы не закрыть базу раньше времени
 
-	appLogger.Infof("Starting server on port: %s", conf.ServerPort)
+	// Создаем сервер (но не запускаем, это сделаем в горутине)
+	srv := router.CreateServer(conf, appLogger, auditor)
 
-	err = router.Launch(conf, appLogger, auditor)
-	if err != nil {
-		appLogger.Fatalw(err.Error(), "Main", "Start server")
+	// Канал для перехвата сигналов ОС
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+	// Запускаем сервер в отдельной горутине
+	go func() {
+		appLogger.Infof("Starting server on port: %s (HTTPS: %v)", conf.ServerPort, conf.EnableHTTPS)
+		var err error
+		if conf.EnableHTTPS {
+			err = srv.ListenAndServeTLS("", "")
+		} else {
+			err = srv.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
+			appLogger.Fatalw(err.Error(), "Main", "Start server")
+		}
+	}()
+
+	// Блокируем main и ждем сигнала
+	sig := <-quit
+	appLogger.Infof("Received signal: %v. Initiating graceful shutdown...", sig)
+
+	// Создаем контекст с таймаутом для завершения текущих запросов
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Останавливаем прием новых запросов и ждем завершения текущих
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		appLogger.Errorf("Server forced to shutdown: %v", err)
+	} else {
+		appLogger.Info("Server stopped gracefully")
 	}
+
+	// 2. Останавливаем воркеры (они сбросят буферы в БД), делаем это после
+	// остановки сервера, чтобы новые запросы на удаление не поступали
+	worker.Stop(appLogger)
+
+	// 3. Закрываем соединения с БД
+	memselect.MemStop(conf, appLogger)
+
+	appLogger.Info("Application exited properly")
 
 	defer appLogger.Sync()
 }

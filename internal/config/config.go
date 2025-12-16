@@ -46,8 +46,6 @@ type Cfg struct {
 	SaveFilePath     string // Путь к файлу для хранения URL (если используется)
 	PostgreDSN       string // DSN для подключения к PostgreSQL
 	MemMode          string // Режим хранения ("postgres", "savefile", "memstore")
-	MigrateID        string // (Устарело, используется goose)
-	MigrateDirection string // (Устарело, используется goose)
 	DBReinitialize   bool   // Флаг, указывающий на необходимость запуска миграций
 	AuthorizationKey string // Секретный ключ для подписи JWT-токенов
 	TokenExpiry      int    // Срок жизни JWT-токена в часах
