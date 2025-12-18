@@ -26,18 +26,18 @@ func TestJWTAuthRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenString)
 
-	parsedUserID, err := getUserID(conf, tokenString)
+	parsedUserID, err := GetUserID(conf, tokenString)
 	require.NoError(t, err)
 	assert.Equal(t, testUserID, parsedUserID)
 
 	t.Run("Invalid Signature", func(t *testing.T) {
 		wrongConf := &config.Cfg{AuthorizationKey: "wrong-key"}
-		_, err := getUserID(wrongConf, tokenString)
+		_, err := GetUserID(wrongConf, tokenString)
 		assert.Error(t, err)
 	})
 
 	t.Run("Malformed Token", func(t *testing.T) {
-		_, err := getUserID(conf, "not.a.real.token")
+		_, err := GetUserID(conf, "not.a.real.token")
 		assert.Error(t, err)
 	})
 
@@ -50,7 +50,7 @@ func TestJWTAuthRoundTrip(t *testing.T) {
 		expiredToken, err := buildJWTString(expiredConf, testUserID)
 		require.NoError(t, err)
 
-		_, err = getUserID(expiredConf, expiredToken)
+		_, err = GetUserID(expiredConf, expiredToken)
 		assert.Error(t, err)
 	})
 }
@@ -181,7 +181,7 @@ func BenchmarkBuildJWTString(b *testing.B) {
 func BenchmarkGetUserID(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		benchResult, _ = getUserID(benchConf, benchToken)
+		benchResult, _ = GetUserID(benchConf, benchToken)
 	}
 }
 

@@ -33,7 +33,8 @@ func buildJWTString(conf *config.Cfg, userID string) (string, error) {
 	return tokenString, nil
 }
 
-func getUserID(conf *config.Cfg, tokenString string) (string, error) {
+// GetUserID экспортируем для использования в gRPC интерцепторе
+func GetUserID(conf *config.Cfg, tokenString string) (string, error) {
 	claims := &claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
@@ -97,7 +98,7 @@ func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 				return
 			}
 
-			userID, err := getUserID(conf, cookie.Value)
+			userID, err := GetUserID(conf, cookie.Value)
 			if err != nil {
 
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
