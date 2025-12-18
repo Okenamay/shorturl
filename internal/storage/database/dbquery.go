@@ -174,3 +174,15 @@ func GetUserURLs(conf *config.Cfg, appLogger *zap.SugaredLogger, userID string) 
 
 	return userURLs, nil
 }
+
+// GetStats возвращает количество URL и количество уникальных пользователей
+func GetStats(ctx context.Context) (int, int, error) {
+	var urls, users int
+
+	row := DBPool.QueryRow(ctx, "SELECT COUNT(*), COUNT(DISTINCT user_id) FROM urls")
+	err := row.Scan(&urls, &users)
+	if err != nil {
+		return 0, 0, err
+	}
+	return urls, users, nil
+}

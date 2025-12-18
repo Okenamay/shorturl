@@ -60,6 +60,7 @@ func NewRouter(conf *config.Cfg, appLogger *zap.SugaredLogger, auditor *audit.Au
 	router.Post("/api/shorten/batch", handlers.BatchHandlerTransaction(conf, appLogger))
 	router.Get("/api/user/urls", handlers.UserURLsHandler(conf, appLogger))
 	router.Delete("/api/user/urls", handlers.BatchDeleter(conf))
+	router.Get("/api/internal/stats", handlers.InternalStats(conf, appLogger))
 
 	router.With(
 		gzipper.Decompressor(appLogger),
