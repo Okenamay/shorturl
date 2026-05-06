@@ -1,0 +1,381 @@
+// package database
+
+// import (
+// 	"context"
+// 	"errors"
+// 	"regexp"
+// 	"testing"
+
+// 	"github.com/Okenamay/shorturl.git/internal/config"
+// 	"github.com/jackc/pgx/v5"
+// 	"github.com/pashagolub/pgxmock/v3"
+// 	"github.com/stretchr/testify/assert"
+// 	"github.com/stretchr/testify/require"
+// 	"go.uber.org/zap"
+// )
+
+// // setupQueriesTest - немного отличается, т.к. DBPool уже мок.
+// func setupQueriesTest(t *testing.T) (pgxmock.PgxPoolIface, *zap.SugaredLogger) {
+// 	mock, err := pgxmock.NewPool()
+// 	require.NoError(t, err)
+// 	DBPool = mock
+// 	logger := zap.NewNop().Sugar()
+
+// 	t.Cleanup(func() {
+// 		DBPool.Close()
+// 		DBPool = nil
+// 	})
+// 	return mock, logger
+// }
+
+// func TestDeleteFlaggedURLs(t *testing.T) {
+// 	ctx := context.Background()
+
+// 	t.Run("Delete success with rows affected", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectExec("DELETE FROM urls WHERE del_flag = true").
+// 			WillReturnResult(pgxmock.NewResult("DELETE", 5))
+
+// 		err := DeleteFlaggedURLs(ctx, logger)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Delete success with no rows affected", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectExec("DELETE FROM urls WHERE del_flag = true").
+// 			WillReturnResult(pgxmock.NewResult("DELETE", 0))
+
+// 		err := DeleteFlaggedURLs(ctx, logger)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Delete fail", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectExec("DELETE FROM urls WHERE del_flag = true").
+// 			WillReturnError(errors.New("db error"))
+
+// 		err := DeleteFlaggedURLs(ctx, logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "db error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Delete with nil pool", func(t *testing.T) {
+// 		_, logger := setupQueriesTest(t)
+// 		DBPool = nil
+// 		err := DeleteFlaggedURLs(ctx, logger)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "database pool is not initialized")
+// 	})
+// }
+
+// func TestGetURLInfo(t *testing.T) {
+// 	t.Run("Get success", func(t *testing.T) {
+// 		mock, _ := setupQueriesTest(t)
+// 		rows := pgxmock.NewRows([]string{"url", "del_flag"}).
+// 			AddRow("https://google.com", false)
+// 		mock.ExpectQuery("SELECT url, del_flag FROM urls WHERE short_id = \\$1").
+// 			WithArgs("short1").
+// 			WillReturnRows(rows)
+
+// 		info, err := GetURLInfo("short1")
+// 		require.NoError(t, err)
+// 		assert.Equal(t, "https://google.com", info.OriginalURL)
+// 		assert.False(t, info.IsDeleted)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Get deleted success", func(t *testing.T) {
+// 		mock, _ := setupQueriesTest(t)
+// 		rows := pgxmock.NewRows([]string{"url", "del_flag"}).
+// 			AddRow("https://deleted.com", true)
+// 		mock.ExpectQuery("SELECT url, del_flag FROM urls WHERE short_id = \\$1").
+// 			WithArgs("short2").
+// 			WillReturnRows(rows)
+
+// 		info, err := GetURLInfo("short2")
+// 		require.NoError(t, err)
+// 		assert.Equal(t, "https://deleted.com", info.OriginalURL)
+// 		assert.True(t, info.IsDeleted)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Get not found", func(t *testing.T) {
+// 		mock, _ := setupQueriesTest(t)
+// 		mock.ExpectQuery("SELECT url, del_flag FROM urls WHERE short_id = \\$1").
+// 			WithArgs("short3").
+// 			WillReturnError(pgx.ErrNoRows)
+
+// 		info, err := GetURLInfo("short3")
+// 		require.NoError(t, err)
+// 		assert.Empty(t, info.OriginalURL)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Get db error", func(t *testing.T) {
+// 		mock, _ := setupQueriesTest(t)
+// 		mock.ExpectQuery("SELECT url, del_flag FROM urls WHERE short_id = \\$1").
+// 			WithArgs("short4").
+// 			WillReturnError(errors.New("db error"))
+
+// 		_, err := GetURLInfo("short4")
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "db error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+// }
+
+// func TestBatchDelete(t *testing.T) {
+// 	ctx := context.Background()
+// 	userID := "user1"
+// 	shortIDs := []string{"s1", "s2"}
+
+// 	t.Run("BatchDelete success", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectBegin()
+// 		mock.ExpectPrepare("batch_delete", "UPDATE urls SET del_flag = true WHERE user_id = \\$1 AND short_id = \\$2")
+
+// 		// Ожидаем два Exec в батче
+// 		batch := &pgx.Batch{}
+// 		batch.Queue("batch_delete", userID, "s1")
+// 		batch.Queue("batch_delete", userID, "s2")
+// 		mock.ExpectSendBatch(batch, pgxmock.NewBatchResults().
+// 			ExecResults(pgxmock.NewResult("UPDATE", 1), pgxmock.NewResult("UPDATE", 1)).
+// 			CloseResult(nil))
+
+// 		mock.ExpectCommit()
+// 		mock.ExpectRollback() // На всякий случай, если Commit упадет
+
+// 		err := BatchDelete(ctx, logger, userID, shortIDs)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("BatchDelete error on begin", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectBegin().WillReturnError(errors.New("begin error"))
+
+// 		err := BatchDelete(ctx, logger, userID, shortIDs)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "begin error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("BatchDelete error on prepare", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectBegin()
+// 		mock.ExpectPrepare("batch_delete", "UPDATE urls SET del_flag = true WHERE user_id = \\$1 AND short_id = \\$2").
+// 			WillReturnError(errors.New("prepare error"))
+// 		mock.ExpectRollback()
+
+// 		err := BatchDelete(ctx, logger, userID, shortIDs)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "prepare error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("BatchDelete error on batch exec", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectBegin()
+// 		mock.ExpectPrepare("batch_delete", "UPDATE urls SET del_flag = true WHERE user_id = \\$1 AND short_id = \\$2")
+
+// 		batch := &pgx.Batch{}
+// 		batch.Queue("batch_delete", userID, "s1")
+// 		batch.Queue("batch_delete", userID, "s2")
+
+// 		// Один из Exec в батче фейлится
+// 		mock.ExpectSendBatch(batch, pgxmock.NewBatchResults().
+// 			ExecResults(pgxmock.NewResult("UPDATE", 1), errors.New("batch exec error")).
+// 			CloseResult(nil))
+
+// 		mock.ExpectRollback() // Ожидаем Rollback, т.к. Commit не будет вызван
+
+// 		err := BatchDelete(ctx, logger, userID, shortIDs)
+// 		// Ошибка в Exec не прерывает BatchDelete, но tx.Commit() должен выполниться
+// 		// Ваша функция BatchDelete не возвращает ошибку из batch.Exec, она только логирует ее.
+// 		// Поэтому мы ожидаем Commit
+// 		mock.ExpectCommit()
+
+// 		err = BatchDelete(ctx, logger, userID, shortIDs)
+// 		require.NoError(t, err) // Функция не возвращает ошибку, только логирует
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+// }
+
+// func TestAddOne(t *testing.T) {
+// 	conf := &config.Cfg{}
+// 	userID := "user1"
+// 	shortID := "short1"
+// 	fullURL := "https://google.com"
+
+// 	t.Run("AddOne success", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+
+// 		// 1. Ожидаем SELECT EXISTS -> false
+// 		mock.ExpectQuery("SELECT EXISTS \\(SELECT 1 FROM urls WHERE url = \\$1\\)").
+// 			WithArgs(fullURL).
+// 			WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
+
+// 		// 2. Ожидаем INSERT
+// 		mock.ExpectExec("INSERT INTO urls \\(user_id, url, short_id\\) VALUES \\(\\$1, \\$2, \\$3\\)").
+// 			WithArgs(userID, fullURL, shortID).
+// 			WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+// 		exists, err := AddOne(conf, logger, userID, shortID, fullURL)
+// 		require.NoError(t, err)
+// 		assert.False(t, exists)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("AddOne conflict", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+
+// 		// 1. Ожидаем SELECT EXISTS -> true
+// 		mock.ExpectQuery("SELECT EXISTS \\(SELECT 1 FROM urls WHERE url = \\$1\\)").
+// 			WithArgs(fullURL).
+// 			WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+// 		// INSERT не должен быть вызван
+
+// 		exists, err := AddOne(conf, logger, userID, shortID, fullURL)
+// 		require.NoError(t, err)
+// 		assert.True(t, exists)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("AddOne error on SELECT EXISTS", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+// 		mock.ExpectQuery("SELECT EXISTS \\(SELECT 1 FROM urls WHERE url = \\$1\\)").
+// 			WithArgs(fullURL).
+// 			WillReturnError(errors.New("select exists error"))
+
+// 		exists, err := AddOne(conf, logger, userID, shortID, fullURL)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "select exists error")
+// 		assert.False(t, exists)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("AddOne error on INSERT", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+
+// 		mock.ExpectQuery("SELECT EXISTS \\(SELECT 1 FROM urls WHERE url = \\$1\\)").
+// 			WithArgs(fullURL).
+// 			WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
+
+// 		mock.ExpectExec("INSERT INTO urls \\(user_id, url, short_id\\) VALUES \\(\\$1, \\$2, \\$3\\)").
+// 			WithArgs(userID, fullURL, shortID).
+// 			WillReturnError(errors.New("insert error"))
+
+// 		exists, err := AddOne(conf, logger, userID, shortID, fullURL)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "insert error")
+// 		assert.False(t, exists)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("AddOne nil pool", func(t *testing.T) {
+// 		_, logger := setupQueriesTest(t)
+// 		DBPool = nil
+
+// 		exists, err := AddOne(conf, logger, userID, shortID, fullURL)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "AddOne. DB pool is not initialized")
+// 		assert.False(t, exists)
+// 	})
+// }
+
+// func TestAddOneTransaction(t *testing.T) {
+// 	ctx := context.Background()
+// 	logger := zap.NewNop().Sugar()
+// 	userID := "user1"
+// 	shortID := "short1"
+// 	fullURL := "https://google.com"
+
+// 	t.Run("AddOneTransaction success", func(t *testing.T) {
+// 		mock, err := pgxmock.NewConn() // Мокаем Conn, т.к. Tx - это интерфейс Conn
+// 		require.NoError(t, err)
+// 		defer mock.Close(ctx)
+
+// 		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO urls (user_id, url, short_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING")).
+// 			WithArgs(userID, fullURL, shortID).
+// 			WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+// 		err = AddOneTransaction(ctx, mock, logger, userID, shortID, fullURL)
+// 		require.NoError(t, err)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("AddOneTransaction error", func(t *testing.T) {
+// 		mock, err := pgxmock.NewConn()
+// 		require.NoError(t, err)
+// 		defer mock.Close(ctx)
+
+// 		mock.ExpectExec(regexp.QuoteMeta("INSERT INTO urls (user_id, url, short_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING")).
+// 			WithArgs(userID, fullURL, shortID).
+// 			WillReturnError(errors.New("tx exec error"))
+
+// 		err = AddOneTransaction(ctx, mock, logger, userID, shortID, fullURL)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "tx exec error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+// }
+
+// func TestGetUserURLs(t *testing.T) {
+// 	conf := &config.Cfg{ShortIDAddress: "http://localhost:8080"}
+// 	userID := "user1"
+
+// 	t.Run("Get user URLs success", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+
+// 		rows := pgxmock.NewRows([]string{"short_id", "url"}).
+// 			AddRow("short1", "https://google.com").
+// 			AddRow("short2", "https://yandex.ru")
+
+// 		mock.ExpectQuery(regexp.QuoteMeta("SELECT short_id, url FROM urls WHERE user_id = $1 AND del_flag = false")).
+// 			WithArgs(userID).
+// 			WillReturnRows(rows)
+
+// 		urls, err := GetUserURLs(conf, logger, userID)
+// 		require.NoError(t, err)
+// 		require.Len(t, urls, 2)
+
+// 		assert.Equal(t, "http://localhost:8080/short1", urls[0].ShortURL)
+// 		assert.Equal(t, "https://google.com", urls[0].OriginalURL)
+// 		assert.Equal(t, "http://localhost:8080/short2", urls[1].ShortURL)
+// 		assert.Equal(t, "https://yandex.ru", urls[1].OriginalURL)
+
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Get user URLs no content", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+
+// 		rows := pgxmock.NewRows([]string{"short_id", "url"})
+
+// 		mock.ExpectQuery(regexp.QuoteMeta("SELECT short_id, url FROM urls WHERE user_id = $1 AND del_flag = false")).
+// 			WithArgs(userID).
+// 			WillReturnRows(rows)
+
+// 		urls, err := GetUserURLs(conf, logger, userID)
+// 		require.NoError(t, err)
+// 		assert.Len(t, urls, 0)
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+
+// 	t.Run("Get user URLs query error", func(t *testing.T) {
+// 		mock, logger := setupQueriesTest(t)
+
+// 		mock.ExpectQuery(regexp.QuoteMeta("SELECT short_id, url FROM urls WHERE user_id = $1 AND del_flag = false")).
+// 			WithArgs(userID).
+// 			WillReturnError(errors.New("query error"))
+
+// 		_, err := GetUserURLs(conf, logger, userID)
+// 		require.Error(t, err)
+// 		assert.EqualError(t, err, "query error")
+// 		assert.NoError(t, mock.ExpectationsWereMet())
+// 	})
+// }
